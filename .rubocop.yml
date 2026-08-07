@@ -23,11 +23,11 @@ Metrics/BlockLength:
 RSpec/ExampleWording:
   Enabled: false
 
-RSpec/RSpec/ExampleLength:
+RSpec/ExampleLength:
   Enabled: false
 
-Style/DataInheritance:
-  Enabled: false
+Style/ClassAndModuleChildren:
+  EnforcedStyle: compact
 
 Style/Documentation:
   Enabled: false

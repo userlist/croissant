@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+class Croissant::Stylesheet
+  attr_reader :rules
+
+  def initialize(rules)
+    @rules = rules
+
+    freeze
+  end
+
+  def to_s
+    rules.join("\n")
+  end
+
+  def ==(other)
+    other.is_a?(self.class) && rules == other.rules
+  end
+  alias eql? ==
+
+  def hash
+    [self.class, rules].hash
+  end
+end
+
+require_relative 'stylesheet/declaration'
+require_relative 'stylesheet/property'
+require_relative 'stylesheet/rule'
+require_relative 'stylesheet/selector'
+require_relative 'stylesheet/specificity'

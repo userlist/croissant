@@ -2,6 +2,6 @@
 
 RSpec.describe Croissant do
   it 'should have a version number' do
-    expect(Croissant::VERSION).not_to be nil
+    expect(Croissant::VERSION).not_to be_nil
   end
 end

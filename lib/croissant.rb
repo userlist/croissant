@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
-require_relative 'croissant/version'
-
 module Croissant
-  class Error < StandardError; end
 end
+
+require_relative 'croissant/version'
+require_relative 'croissant/stylesheet'
+require_relative 'croissant/stylesheet/parser'
