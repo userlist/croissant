@@ -15,6 +15,8 @@ Gem::Specification.new do |spec|
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.2.0'
 
+  spec.add_dependency 'nokogiri', '~> 1.19'
+
   spec.metadata['homepage_uri'] = spec.homepage
   spec.metadata['source_code_uri'] = 'https://github.com/userlist/croissant/'
   spec.metadata['changelog_uri'] = 'https://github.com/userlist/croissant/blob/main/CHANGELOG.md'
