@@ -29,6 +29,42 @@ RSpec.describe Croissant::Stylesheet::Selector do
     end
   end
 
+  describe '#tag' do
+    it 'should return the tag of the rightmost compound' do
+      selector = parse('div#main.content > p.intro')
+
+      expect(selector.tag).to eq('p')
+    end
+
+    it 'should be nil when the rightmost compound has no tag' do
+      expect(parse('.intro').tag).to be_nil
+    end
+  end
+
+  describe '#ids' do
+    it 'should return the ids of the rightmost compound' do
+      selector = parse('div.content #main.intro')
+
+      expect(selector.ids).to eq(['main'])
+    end
+
+    it 'should not include ids from earlier compounds' do
+      expect(parse('#main .intro').ids).to eq([])
+    end
+  end
+
+  describe '#classes' do
+    it 'should return the classes of the rightmost compound' do
+      selector = parse('div.wrapper > p.intro.lead')
+
+      expect(selector.classes).to eq(%w[intro lead])
+    end
+
+    it 'should not include classes from earlier compounds' do
+      expect(parse('.wrapper .intro').classes).to eq(['intro'])
+    end
+  end
+
   describe '#inlinable?' do
     it 'should be inlinable for a plain selector' do
       expect(parse('p.intro')).to be_inlinable

@@ -1,12 +1,15 @@
 # frozen_string_literal: true
 
 class Croissant::Stylesheet::Selector
-  attr_reader :selector, :specificity
+  attr_reader :selector, :specificity, :ids, :classes, :tag
 
-  def initialize(selector:, specificity:, inlinable:)
+  def initialize(selector:, specificity:, inlinable:, ids: [], classes: [], tag: nil) # rubocop:disable Metrics/ParameterLists
     @selector = selector
     @specificity = specificity
     @inlinable = inlinable
+    @ids = ids
+    @classes = classes
+    @tag = tag
 
     freeze
   end

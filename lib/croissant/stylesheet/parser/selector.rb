@@ -34,22 +34,31 @@ class Croissant::Stylesheet::Parser::Selector # rubocop:disable Metrics/ClassLen
   RIGHT_PAREN = ')'.ord
   LEFT_BRACKET = '['.ord
   RIGHT_BRACKET = ']'.ord
+  SPACE = ' '.ord
+  GREATER_THAN = '>'.ord
+  PLUS = '+'.ord
+  TILDE = '~'.ord
   UPPERCASE = (('A'.ord)..('Z'.ord))
   LOWERCASE = (('a'.ord)..('z'.ord))
   DIGITS = (('0'.ord)..('9'.ord))
+  COMBINATORS = [SPACE, GREATER_THAN, PLUS, TILDE].freeze
 
   def self.parse(selector)
     new.parse(selector)
   end
 
-  def parse(selector)
+  def parse(selector) # rubocop:disable Metrics/MethodLength
     selector = selector.to_s.strip
-    ids, classes, elements, pseudo_element, dynamic = analyze(selector, 0, selector.bytesize)
+    ids, classes, elements, pseudo_element, dynamic, key_ids, key_classes, key_tag =
+      analyze(selector, 0, selector.bytesize)
 
     Croissant::Stylesheet::Selector.new(
       selector: selector,
       specificity: Croissant::Stylesheet::Specificity.new(0, ids, classes, elements),
-      inlinable: !pseudo_element && !dynamic
+      inlinable: !pseudo_element && !dynamic,
+      ids: key_ids,
+      classes: key_classes,
+      tag: key_tag
     )
   end
 
@@ -59,16 +68,25 @@ class Croissant::Stylesheet::Parser::Selector # rubocop:disable Metrics/ClassLen
     ids = classes = elements = 0
     pseudo_element = false
     dynamic = false
+    key_ids = []
+    key_classes = []
+    key_tag = nil
 
     while position < stop
       case text.getbyte(position)
       when HASH
         length = word_length(text, position + 1, stop)
-        ids += 1 if length.positive?
+        if length.positive?
+          ids += 1
+          key_ids << text.byteslice(position + 1, length)
+        end
         position += 1 + length
       when DOT
         length = word_length(text, position + 1, stop)
-        classes += 1 if length.positive?
+        if length.positive?
+          classes += 1
+          key_classes << text.byteslice(position + 1, length)
+        end
         position += 1 + length
       when COLON
         position, p_ids, p_classes, p_elements, p_pseudo_element, p_dynamic = analyze_pseudo(text, position, stop)
@@ -85,13 +103,20 @@ class Croissant::Stylesheet::Parser::Selector # rubocop:disable Metrics/ClassLen
         position = matching_paren_index(text, position + 1, stop) + 1
       when UPPERCASE, LOWERCASE
         elements += 1
-        position += 1 + word_length(text, position + 1, stop)
+        length = word_length(text, position + 1, stop)
+        key_tag = text.byteslice(position, 1 + length)
+        position += 1 + length
+      when *COMBINATORS
+        key_ids = []
+        key_classes = []
+        key_tag = nil
+        position += 1
       else
         position += 1
       end
     end
 
-    [ids, classes, elements, pseudo_element, dynamic]
+    [ids, classes, elements, pseudo_element, dynamic, key_ids, key_classes, key_tag]
   end
 
   def analyze_pseudo(text, position, stop) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
