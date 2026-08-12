@@ -49,7 +49,7 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
   end
 
   def initialize
-    @selector_parser = Selector.new
+    @selector_parser = Croissant::Selector::Parser.new
     @declaration_scanner = StringScanner.new('')
     @segment_scanner = StringScanner.new('')
   end
@@ -75,7 +75,7 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
 
   def parse_attribute(content)
     declarations = parse_declarations(content.to_s)
-    specificity = Croissant::Stylesheet::Specificity.style_attribute
+    specificity = Croissant::Selector::Specificity.style_attribute
 
     Croissant::Stylesheet::Rule.new(declarations:, specificity:)
   end
@@ -123,7 +123,7 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
 
     split_segments(prelude).each do |segment|
       selector = parse_selector(segment)
-      next if selector.to_s.empty?
+      next unless selector
 
       rules << Croissant::Stylesheet::Rule.new(selector:, declarations:)
     end
@@ -335,5 +335,3 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
     end
   end
 end
-
-require_relative 'parser/selector'

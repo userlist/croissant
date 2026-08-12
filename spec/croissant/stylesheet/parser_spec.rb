@@ -23,7 +23,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
     it 'should parse a selector' do
       selector = described_class.parse_selector('p.intro')
 
-      expect(selector).to be_a(Croissant::Stylesheet::Selector)
+      expect(selector).to be_a(Croissant::Selector)
     end
   end
 
@@ -49,7 +49,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       end
 
       it 'should expose the selector specificity on the rule' do
-        expect(rules.first.specificity).to eq(Croissant::Stylesheet::Specificity.new(0, 0, 0, 1))
+        expect(rules.first.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 0, 1))
       end
     end
 
@@ -87,13 +87,21 @@ RSpec.describe Croissant::Stylesheet::Parser do
       it 'should assign each selector its own specificity' do
         expect(rules.map(&:specificity))
           .to eq([
-            Croissant::Stylesheet::Specificity.new(0, 0, 1, 1),
-            Croissant::Stylesheet::Specificity.new(0, 1, 0, 0)
+            Croissant::Selector::Specificity.new(0, 0, 1, 1),
+            Croissant::Selector::Specificity.new(0, 1, 0, 0)
           ])
       end
 
       it 'should share the same declarations array between the rules' do
         expect(rules.first.declarations).to be(rules.last.declarations)
+      end
+    end
+
+    context 'with a trailing comma in the selector list' do
+      let(:value) { 'div, { color: red }' }
+
+      it 'should only create a rule for the real selector' do
+        expect(rules.map { |rule| rule.selector.to_s }).to eq(['div'])
       end
     end
 
@@ -139,10 +147,8 @@ RSpec.describe Croissant::Stylesheet::Parser do
       it 'should ignore the comments' do
         expect(rules).to eq([
           Croissant::Stylesheet::Rule.new(
-            selector: Croissant::Stylesheet::Selector.new(
-              selector: 'p',
-              specificity: Croissant::Stylesheet::Specificity.new(0, 0, 0, 1),
-              inlinable: true
+            selector: Croissant::Selector::Compound.new(
+              [Croissant::Selector::Simple::Type.new('p')]
             ),
             declarations: [Croissant::Stylesheet::Declaration.new(property: 'color', value: 'red')]
           )
@@ -250,10 +256,8 @@ RSpec.describe Croissant::Stylesheet::Parser do
       it 'should parse a single declaration' do
         expect(rules).to eq([
           Croissant::Stylesheet::Rule.new(
-            selector: Croissant::Stylesheet::Selector.new(
-              selector: 'p',
-              specificity: Croissant::Stylesheet::Specificity.new(0, 0, 0, 1),
-              inlinable: true
+            selector: Croissant::Selector::Compound.new(
+              [Croissant::Selector::Simple::Type.new('p')]
             ),
             declarations: [
               Croissant::Stylesheet::Declaration.new(
@@ -272,10 +276,8 @@ RSpec.describe Croissant::Stylesheet::Parser do
       it 'should split property and value at the first colon' do
         expect(rules).to eq([
           Croissant::Stylesheet::Rule.new(
-            selector: Croissant::Stylesheet::Selector.new(
-              selector: 'p',
-              specificity: Croissant::Stylesheet::Specificity.new(0, 0, 0, 1),
-              inlinable: true
+            selector: Croissant::Selector::Compound.new(
+              [Croissant::Selector::Simple::Type.new('p')]
             ),
             declarations: [Croissant::Stylesheet::Declaration.new(property: 'background-image', value: 'url(http://example.com/a.png)')]
           )
@@ -358,13 +360,13 @@ RSpec.describe Croissant::Stylesheet::Parser do
         expect(result).to eq(Croissant::Stylesheet::Rule.new(
           selector: nil,
           declarations: [Croissant::Stylesheet::Declaration.new(property: 'color', value: 'red')],
-          specificity: Croissant::Stylesheet::Specificity.style_attribute
+          specificity: Croissant::Selector::Specificity.style_attribute
         ))
       end
 
       it 'should have a specificity above any selector' do
         expect(result.specificity)
-          .to eq(Croissant::Stylesheet::Specificity.new(1, 0, 0, 0))
+          .to eq(Croissant::Selector::Specificity.new(1, 0, 0, 0))
       end
 
       it 'should be inlinable' do
@@ -483,13 +485,15 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'p.intro' }
 
       it 'should return a selector' do
-        expect(result).to eq(
-          Croissant::Stylesheet::Selector.new(
-            selector: 'p.intro',
-            specificity: Croissant::Stylesheet::Specificity.new(0, 0, 1, 1),
-            inlinable: true
-          )
-        )
+        expect(result).to be_a(Croissant::Selector)
+      end
+
+      it 'should count the class' do
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 1, 1))
+      end
+
+      it 'should be inlinable' do
+        expect(result).to be_inlinable
       end
     end
 
@@ -497,13 +501,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'h1' }
 
       it 'should return a selector counting the element' do
-        expect(result).to eq(
-          Croissant::Stylesheet::Selector.new(
-            selector: 'h1',
-            specificity: Croissant::Stylesheet::Specificity.new(0, 0, 0, 1),
-            inlinable: true
-          )
-        )
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 0, 1))
       end
     end
 
@@ -511,13 +509,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { '.intro' }
 
       it 'should return a selector counting the class' do
-        expect(result).to eq(
-          Croissant::Stylesheet::Selector.new(
-            selector: '.intro',
-            specificity: Croissant::Stylesheet::Specificity.new(0, 0, 1, 0),
-            inlinable: true
-          )
-        )
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 1, 0))
       end
     end
 
@@ -525,13 +517,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { '#main' }
 
       it 'should return a selector counting the ID' do
-        expect(result).to eq(
-          Croissant::Stylesheet::Selector.new(
-            selector: '#main',
-            specificity: Croissant::Stylesheet::Specificity.new(0, 1, 0, 0),
-            inlinable: true
-          )
-        )
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 1, 0, 0))
       end
     end
 
@@ -539,41 +525,31 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'a[href^="https://"]' }
 
       it 'should return a selector counting the attribute as a class' do
-        expect(result).to eq(
-          Croissant::Stylesheet::Selector.new(
-            selector: 'a[href^="https://"]',
-            specificity: Croissant::Stylesheet::Specificity.new(0, 0, 1, 1),
-            inlinable: true
-          )
-        )
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 1, 1))
       end
     end
 
     context 'with a pseudo-class selector' do
       let(:value) { 'a:hover' }
 
-      it 'should return a non-inlinable selector counting the pseudo-class as a class' do
-        expect(result).to eq(
-          Croissant::Stylesheet::Selector.new(
-            selector: 'a:hover',
-            specificity: Croissant::Stylesheet::Specificity.new(0, 0, 1, 1),
-            inlinable: false
-          )
-        )
+      it 'should return a selector counting the pseudo-class as a class' do
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 1, 1))
+      end
+
+      it 'should not be inlinable' do
+        expect(result).not_to be_inlinable
       end
     end
 
     context 'with a pseudo-element selector' do
       let(:value) { 'p::after' }
 
-      it 'should return a non-inlinable selector counting the pseudo-element as an element' do
-        expect(result).to eq(
-          Croissant::Stylesheet::Selector.new(
-            selector: 'p::after',
-            specificity: Croissant::Stylesheet::Specificity.new(0, 0, 0, 2),
-            inlinable: false
-          )
-        )
+      it 'should return a selector counting the pseudo-element as an element' do
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 0, 2))
+      end
+
+      it 'should not be inlinable' do
+        expect(result).not_to be_inlinable
       end
     end
 
@@ -581,13 +557,11 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'div#main.content > p.intro:first-child::after' }
 
       it 'should return a selector summing each component across the whole selector' do
-        expect(result).to eq(
-          Croissant::Stylesheet::Selector.new(
-            selector: 'div#main.content > p.intro:first-child::after',
-            specificity: Croissant::Stylesheet::Specificity.new(0, 1, 3, 3),
-            inlinable: false
-          )
-        )
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 1, 3, 3))
+      end
+
+      it 'should not be inlinable' do
+        expect(result).not_to be_inlinable
       end
     end
   end

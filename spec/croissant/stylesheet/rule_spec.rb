@@ -14,7 +14,7 @@ RSpec.describe Croissant::Stylesheet::Rule do
     end
 
     it 'should use the given specificity instead of calculating one' do
-      specificity = Croissant::Stylesheet::Specificity.style_attribute
+      specificity = Croissant::Selector::Specificity.style_attribute
       rule = described_class.new(declarations:, specificity:)
 
       expect(rule.specificity).to be(specificity)
@@ -60,7 +60,7 @@ RSpec.describe Croissant::Stylesheet::Rule do
     end
 
     it 'should be inlinable without a selector' do
-      rule = described_class.new(declarations:, specificity: Croissant::Stylesheet::Specificity.style_attribute)
+      rule = described_class.new(declarations:, specificity: Croissant::Selector::Specificity.style_attribute)
 
       expect(rule).to be_inlinable
     end

@@ -15,6 +15,15 @@ Layout/FirstArrayElementIndentation:
 
 Layout/LineLength:
   Max: 120
+  # Compact class declarations with fully-qualified superclasses can't be wrapped.
+  AllowedPatterns:
+    - '\Aclass '
+
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented
+
+Lint/AssignmentInCondition:
+  Enabled: false
 
 Metrics/BlockLength:
   Exclude:

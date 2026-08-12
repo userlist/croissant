@@ -1,12 +1,16 @@
 # frozen_string_literal: true
 
-class Croissant::Stylesheet::Specificity
+class Croissant::Selector::Specificity
   include Comparable
 
   attr_reader :style, :ids, :classes, :elements
 
   def self.style_attribute
     @style_attribute ||= new(1, 0, 0, 0)
+  end
+
+  def self.zero
+    @zero ||= new(0, 0, 0, 0)
   end
 
   def initialize(style, ids, classes, elements)
@@ -24,6 +28,15 @@ class Croissant::Stylesheet::Specificity
     compare(:style, other) || compare(:ids, other) || compare(:classes, other) || (elements <=> other.elements)
   end
 
+  def +(other)
+    self.class.new(
+      style + other.style,
+      ids + other.ids,
+      classes + other.classes,
+      elements + other.elements
+    )
+  end
+
   def eql?(other)
     other.is_a?(self.class) &&
       style == other.style &&
@@ -34,6 +47,10 @@ class Croissant::Stylesheet::Specificity
 
   def hash
     [self.class, style, ids, classes, elements].hash
+  end
+
+  def inspect
+    "<#{self.class} [#{style}, #{ids}, #{classes}, #{elements}]>"
   end
 
   private

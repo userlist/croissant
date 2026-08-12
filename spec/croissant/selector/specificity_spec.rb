@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe Croissant::Stylesheet::Specificity do
+RSpec.describe Croissant::Selector::Specificity do
   def calculate(value)
     Croissant::Stylesheet::Parser.parse_selector(value).specificity
   end
