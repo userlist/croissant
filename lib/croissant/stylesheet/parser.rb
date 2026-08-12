@@ -7,6 +7,7 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
   IMPORTANT = /!\s*important\s*\z/i
 
   AT_RULE_NAME = /[\w-]*/
+  CONDITIONAL_GROUP_NAMES = %w[media supports].freeze
   WHITESPACE = /\s+/
   COMMENT_OPEN = %r{/\*}
   COMMENT_CLOSE = %r{\*/}
@@ -54,23 +55,10 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
     @segment_scanner = StringScanner.new('')
   end
 
-  def parse(content) # rubocop:disable Metrics/MethodLength
+  def parse(content)
     scanner = StringScanner.new(content.to_s.gsub(HTML_COMMENT, ' '))
-    string = scanner.string
-    @rules = []
 
-    until scanner.eos?
-      skip_insignificant(scanner)
-      break if scanner.eos?
-
-      case string.getbyte(scanner.pos)
-      when RIGHT_BRACE then scanner.pos += 1
-      when AT_SIGN then consume_at_rule(scanner)
-      else consume_rule(scanner)
-      end
-    end
-
-    Croissant::Stylesheet.new(rules)
+    Croissant::Stylesheet.new(parse_rule_list(scanner, nested: false))
   end
 
   def parse_attribute(content)
@@ -86,7 +74,27 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
 
   private
 
-  attr_reader :rules, :selector_parser
+  attr_reader :selector_parser
+
+  def parse_rule_list(scanner, nested:) # rubocop:disable Metrics/MethodLength
+    string = scanner.string
+    rules = []
+
+    until scanner.eos?
+      skip_insignificant(scanner)
+      break if scanner.eos?
+
+      case string.getbyte(scanner.pos)
+      when RIGHT_BRACE
+        scanner.pos += 1
+        break if nested
+      when AT_SIGN then consume_at_rule(scanner, rules)
+      else consume_rule(scanner, rules)
+      end
+    end
+
+    rules
+  end
 
   def parse_declarations(content)
     scanner = @declaration_scanner
@@ -103,21 +111,37 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
     declarations
   end
 
-  def consume_at_rule(scanner)
+  def consume_at_rule(scanner, rules)
     scanner.pos += 1
-    scanner.skip(AT_RULE_NAME)
-    _prelude, terminator = scan_prelude(scanner)
-
-    skip_block(scanner) if terminator == LEFT_BRACE
-  end
-
-  def consume_rule(scanner)
+    name = scanner.scan(AT_RULE_NAME)
     prelude, terminator = scan_prelude(scanner)
 
-    consume_declaration_block(scanner, prelude) if terminator == LEFT_BRACE
+    name.downcase!
+    at_rule = build_at_rule(scanner, name, prelude.strip, terminator)
+
+    scanner.pos -= 1 if terminator == RIGHT_BRACE
+    rules << at_rule unless name.empty?
   end
 
-  def consume_declaration_block(scanner, prelude)
+  def build_at_rule(scanner, name, prelude, terminator)
+    return Croissant::Stylesheet::AtRule::Statement.new(name:, prelude:) unless terminator == LEFT_BRACE
+
+    if CONDITIONAL_GROUP_NAMES.include?(name)
+      rules = parse_rule_list(scanner, nested: true)
+
+      Croissant::Stylesheet::AtRule::ConditionalGroup.new(name:, prelude:, rules:)
+    else
+      Croissant::Stylesheet::AtRule::Block.new(name:, prelude:, body: scan_raw_block(scanner).strip)
+    end
+  end
+
+  def consume_rule(scanner, rules)
+    prelude, terminator = scan_prelude(scanner)
+
+    consume_declaration_block(scanner, prelude, rules) if terminator == LEFT_BRACE
+  end
+
+  def consume_declaration_block(scanner, prelude, rules)
     block, _terminator = scan_block_body(scanner)
     declarations = parse_declarations(block)
 
@@ -129,7 +153,9 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def skip_block(scanner)
+  def scan_raw_block(scanner) # rubocop:disable Metrics/MethodLength
+    string = scanner.string
+    start = scanner.pos
     depth = 1
 
     while depth.positive?
@@ -138,9 +164,11 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
       case terminator
       when LEFT_BRACE then depth += 1
       when RIGHT_BRACE then depth -= 1
-      when nil then break
+      when nil then return string.byteslice(start, scanner.pos - start)
       end
     end
+
+    string.byteslice(start, scanner.pos - 1 - start)
   end
 
   def parse_declaration(content)

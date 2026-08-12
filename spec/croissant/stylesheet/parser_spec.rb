@@ -183,32 +183,110 @@ RSpec.describe Croissant::Stylesheet::Parser do
     context 'with a media at-rule' do
       let(:value) { '@media print { p { color: red } } h1 { color: blue }' }
 
-      it 'should skip the block including its rules' do
-        expect(rules.map { |rule| rule.selector.to_s }).to eq(['h1'])
+      it 'should capture the at-rule as a conditional group' do
+        expect(rules.first).to be_a(Croissant::Stylesheet::AtRule::ConditionalGroup)
+      end
+
+      it 'should capture the name' do
+        expect(rules.first.name).to eq('media')
+      end
+
+      it 'should capture the prelude' do
+        expect(rules.first.prelude).to eq('print')
+      end
+
+      it 'should parse the selectors of nested rules' do
+        expect(rules.first.rules.first.selector.to_s).to eq('p')
+      end
+
+      it 'should parse the declarations of nested rules' do
+        expect(rules.first.rules.first.declarations.first.property).to eq('color')
+      end
+
+      it 'should keep following rules in source order' do
+        expect(rules.last.selector.to_s).to eq('h1')
       end
     end
 
     context 'with nested at-rules' do
       let(:value) { '@media print { @media screen { p { color: red } } } h1 { color: blue }' }
 
-      it 'should skip the outer block including any nested blocks' do
-        expect(rules.map { |rule| rule.selector.to_s }).to eq(['h1'])
+      it 'should capture the nested at-rule inside the outer one' do
+        nested = rules.first.rules.first
+
+        expect(nested).to be_a(Croissant::Stylesheet::AtRule::ConditionalGroup)
+      end
+
+      it 'should capture the prelude of the nested at-rule' do
+        expect(rules.first.rules.first.prelude).to eq('screen')
+      end
+
+      it 'should parse the rules of the nested at-rule' do
+        expect(rules.first.rules.first.rules.first.selector.to_s).to eq('p')
+      end
+
+      it 'should keep following rules in source order' do
+        expect(rules.last.selector.to_s).to eq('h1')
       end
     end
 
     context 'with statement at-rules' do
       let(:value) { '@import url(base.css); @charset "utf-8"; p { color: red }' }
 
-      it 'should skip the statements' do
-        expect(rules.count).to eq(1)
+      it 'should capture the first statement' do
+        statement = Croissant::Stylesheet::AtRule::Statement.new(name: 'import', prelude: 'url(base.css)')
+
+        expect(rules.first).to eq(statement)
+      end
+
+      it 'should capture the second statement' do
+        statement = Croissant::Stylesheet::AtRule::Statement.new(name: 'charset', prelude: '"utf-8"')
+
+        expect(rules[1]).to eq(statement)
+      end
+
+      it 'should keep following rules in source order' do
+        expect(rules.last.selector.to_s).to eq('p')
+      end
+    end
+
+    context 'with a statement at-rule at the end of input' do
+      let(:value) { 'p { color: red } @import url(base.css)' }
+
+      it 'should capture the statement' do
+        expect(rules.last).to eq(Croissant::Stylesheet::AtRule::Statement.new(name: 'import', prelude: 'url(base.css)'))
+      end
+    end
+
+    context 'with a statement at-rule terminated by the closing brace of a group' do
+      let(:value) { '@media print { @import url(base.css) } h1 { color: blue }' }
+
+      it 'should capture the statement inside the group' do
+        nested = rules.first.rules.first
+
+        expect(nested).to eq(Croissant::Stylesheet::AtRule::Statement.new(name: 'import', prelude: 'url(base.css)'))
+      end
+
+      it 'should not consume rules after the group' do
+        expect(rules.last.selector.to_s).to eq('h1')
       end
     end
 
     context 'with a font-face at-rule' do
       let(:value) { '@font-face { font-family: Custom; src: url(font.woff) } p { color: red }' }
 
-      it 'should skip the block' do
-        expect(rules.map { |rule| rule.selector.to_s }).to eq(['p'])
+      it 'should capture the raw block' do
+        expect(rules.first).to eq(
+          Croissant::Stylesheet::AtRule::Block.new(
+            name: 'font-face',
+            prelude: '',
+            body: 'font-family: Custom; src: url(font.woff)'
+          )
+        )
+      end
+
+      it 'should keep following rules in source order' do
+        expect(rules.last.selector.to_s).to eq('p')
       end
     end
 
@@ -217,15 +295,87 @@ RSpec.describe Croissant::Stylesheet::Parser do
         '@keyframes spin { from { transform: rotate(0) } to { transform: rotate(360deg) } } p { color: red }'
       end
 
-      it 'should skip the nested blocks' do
-        expect(rules.map { |rule| rule.selector.to_s }).to eq(['p'])
+      it 'should capture the nested blocks verbatim' do
+        expect(rules.first).to eq(
+          Croissant::Stylesheet::AtRule::Block.new(
+            name: 'keyframes',
+            prelude: 'spin',
+            body: 'from { transform: rotate(0) } to { transform: rotate(360deg) }'
+          )
+        )
+      end
+
+      it 'should keep following rules in source order' do
+        expect(rules.last.selector.to_s).to eq('p')
       end
     end
 
     context 'with a supports at-rule' do
       let(:value) { '@supports (display: grid) { p { color: red } } h1 { color: blue }' }
 
-      it 'should skip the block including its rules' do
+      it 'should capture the at-rule as a conditional group' do
+        expect(rules.first).to be_a(Croissant::Stylesheet::AtRule::ConditionalGroup)
+      end
+
+      it 'should capture the prelude' do
+        expect(rules.first.prelude).to eq('(display: grid)')
+      end
+
+      it 'should parse the nested rules' do
+        expect(rules.first.rules.first.selector.to_s).to eq('p')
+      end
+    end
+
+    context 'with an unknown block at-rule' do
+      let(:value) { '@layer base { p { color: red } }' }
+
+      it 'should capture the raw block' do
+        expect(rules.first).to eq(
+          Croissant::Stylesheet::AtRule::Block.new(name: 'layer', prelude: 'base', body: 'p { color: red }')
+        )
+      end
+    end
+
+    context 'with an unterminated at-rule block' do
+      let(:value) { '@media print { p { color: red }' }
+
+      it 'should capture the rules up to the end of input' do
+        expect(rules.first.rules.first.selector.to_s).to eq('p')
+      end
+    end
+
+    context 'with an uppercase at-rule name' do
+      let(:value) { '@MEDIA PRINT { p { color: red } }' }
+
+      it 'should downcase the name' do
+        expect(rules.first.name).to eq('media')
+      end
+
+      it 'should keep the prelude verbatim' do
+        expect(rules.first.prelude).to eq('PRINT')
+      end
+    end
+
+    context 'with a comment in an at-rule prelude' do
+      let(:value) { '@media /* screen or */ print { p { color: red } }' }
+
+      it 'should splice the comment out of the prelude' do
+        expect(rules.first.prelude).to eq('print')
+      end
+    end
+
+    context 'with a comment in a raw at-rule body' do
+      let(:value) { '@font-face { /* local */ font-family: Custom }' }
+
+      it 'should keep the comment in the body' do
+        expect(rules.first.body).to eq('/* local */ font-family: Custom')
+      end
+    end
+
+    context 'with an at-rule without a name' do
+      let(:value) { '@ { p { color: red } } h1 { color: blue }' }
+
+      it 'should skip the at-rule but keep following rules' do
         expect(rules.map { |rule| rule.selector.to_s }).to eq(['h1'])
       end
     end
