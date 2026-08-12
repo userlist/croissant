@@ -13,6 +13,18 @@ class Croissant::Selector::Specificity
     @zero ||= new(0, 0, 0, 0)
   end
 
+  def self.id
+    @id ||= new(0, 1, 0, 0)
+  end
+
+  def self.class_name
+    @class_name ||= new(0, 0, 1, 0)
+  end
+
+  def self.element
+    @element ||= new(0, 0, 0, 1)
+  end
+
   def initialize(style, ids, classes, elements)
     @style = style
     @ids = ids

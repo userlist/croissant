@@ -23,6 +23,6 @@ class Croissant::Selector::PseudoClass::Unknown < Croissant::Selector::PseudoCla
   end
 
   def specificity
-    Croissant::Selector::Specificity.new(0, 0, 1, 0)
+    Croissant::Selector::Specificity.class_name
   end
 end

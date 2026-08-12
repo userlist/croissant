@@ -6,7 +6,7 @@ class Croissant::Selector::Simple::ClassName < Croissant::Selector::Simple
   end
 
   def specificity
-    Croissant::Selector::Specificity.new(0, 0, 1, 0)
+    Croissant::Selector::Specificity.class_name
   end
 
   def to_s

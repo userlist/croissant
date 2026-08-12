@@ -19,7 +19,7 @@ class Croissant::Selector::PseudoElement < Croissant::Selector
   end
 
   def specificity
-    Croissant::Selector::Specificity.new(0, 0, 0, 1)
+    Croissant::Selector::Specificity.element
   end
 
   def to_s

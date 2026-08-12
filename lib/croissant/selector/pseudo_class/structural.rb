@@ -6,7 +6,7 @@ class Croissant::Selector::PseudoClass::Structural < Croissant::Selector::Pseudo
   end
 
   def specificity
-    Croissant::Selector::Specificity.new(0, 0, 1, 0)
+    Croissant::Selector::Specificity.class_name
   end
 end
 
