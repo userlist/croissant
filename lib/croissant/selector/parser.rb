@@ -10,6 +10,8 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
 
   FUNCTIONAL_PSEUDO_NAMES = %w[is not has where].freeze
   CLOSING_BRACKET = ']'
+  OPENING_PAREN = '('
+  CLOSING_PAREN = ')'
 
   ATTRIBUTE_OPERATORS = {
     '~=' => :includes,
@@ -45,7 +47,6 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
   LOWERCASE = (('a'.ord)..('z'.ord))
   DIGITS = (('0'.ord)..('9'.ord))
   WHITESPACE_BYTES = [SPACE, TAB, NEWLINE, CARRIAGE_RETURN, FORM_FEED].freeze
-  COMBINATORS = (WHITESPACE_BYTES + [GREATER_THAN, PLUS, TILDE]).freeze
   QUOTE_BYTES = [DOUBLE_QUOTE, SINGLE_QUOTE].freeze
   CASE_INSENSITIVE_FLAG_BYTES = ['i'.ord, 'I'.ord].freeze
   CASE_SENSITIVE_FLAG_BYTES = ['s'.ord, 'S'.ord].freeze
@@ -92,6 +93,14 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
     'nth-last-child' => Croissant::Selector::PseudoClass::Structural::NthLastChild,
     'nth-last-of-type' => Croissant::Selector::PseudoClass::Structural::NthLastOfType
   }.freeze
+  CASE_FLAG_BYTES = (CASE_INSENSITIVE_FLAG_BYTES + CASE_SENSITIVE_FLAG_BYTES).freeze
+  WORD_BYTES = Array.new(256) do |byte|
+    UPPERCASE.cover?(byte) || LOWERCASE.cover?(byte) || DIGITS.cover?(byte) ||
+      byte == HYPHEN || byte == UNDERSCORE
+  end.freeze
+  TYPE_START_BYTES = Array.new(256) do |byte|
+    UPPERCASE.cover?(byte) || LOWERCASE.cover?(byte)
+  end.freeze
   NTH_KEYWORDS = { 'odd' => [2, 1], 'even' => [2, 0] }.freeze
   NTH_INTEGER = /\A[+-]?\d+\z/
   NTH_FORMULA = /\A([+-]?\d*)n\s*([+-]\s*\d+)?\z/
@@ -102,6 +111,12 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
     def initialize
       @compounds = []
       @combinators = []
+      reset
+    end
+
+    def clear!
+      compounds.clear
+      combinators.clear
       reset
     end
 
@@ -147,23 +162,57 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
     new.parse(selector)
   end
 
-  def parse(selector)
-    selector = selector.to_s.strip
-    stop = selector.bytesize
-    compounds, combinators = analyze_compounds(selector, stop)
-    return if compounds.empty?
+  def initialize
+    @builders = []
+    @depth = 0
+    @position = 0
+  end
 
-    build_root(compounds, combinators)
+  def parse(selector)
+    position = @position
+    selector = strip_padding(selector.to_s)
+    builder = scan_compounds(selector, selector.bytesize)
+    return if builder.compounds.empty?
+
+    build_root(builder.compounds, builder.combinators)
+  ensure
+    @position = position
   end
 
   private
 
-  def analyze_compounds(text, stop) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
-    builder = CompoundBuilder.new
+  def strip_padding(text)
+    return text if text.empty?
+
+    padded = WHITESPACE_BYTES.include?(text.getbyte(0)) ||
+             WHITESPACE_BYTES.include?(text.getbyte(text.bytesize - 1))
+
+    padded ? text.strip : text
+  end
+
+  def scan_compounds(text, stop) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    builder = (@builders[@depth] ||= CompoundBuilder.new)
+    builder.clear!
+    @depth += 1
     position = 0
 
     while position < stop
-      case text.getbyte(position)
+      byte = text.getbyte(position)
+
+      if TYPE_START_BYTES[byte]
+        length = word_length(text, position + 1, stop)
+        builder.flush!
+        builder.start!
+        builder.add(Croissant::Selector::Simple::Type.new(text.byteslice(position, 1 + length)))
+        position += 1 + length
+        next
+      elsif (combinator = COMBINATOR_SYMBOLS[byte])
+        builder.combinator!(combinator)
+        position += 1
+        next
+      end
+
+      case byte
       when HASH
         length = word_length(text, position + 1, stop)
         if length.positive?
@@ -181,7 +230,9 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
         end
         position += 1 + length
       when COLON
-        position, pseudo = parse_pseudo(text, position, stop)
+        @position = position
+        pseudo = parse_pseudo(text, stop)
+        position = @position
 
         if pseudo
           builder.flush!
@@ -189,7 +240,9 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
           builder.add(pseudo)
         end
       when LEFT_BRACKET
-        attribute, position = parse_attribute(text, position + 1, stop)
+        @position = position + 1
+        attribute = parse_attribute(text, stop)
+        position = @position
         builder.flush!
         builder.start!
         builder.add(attribute)
@@ -199,15 +252,6 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
         builder.flush!
         builder.start!
         position += 1
-      when UPPERCASE, LOWERCASE
-        length = word_length(text, position + 1, stop)
-        builder.flush!
-        builder.start!
-        builder.add(Croissant::Selector::Simple::Type.new(text.byteslice(position, 1 + length)))
-        position += 1 + length
-      when *COMBINATORS
-        builder.combinator!(COMBINATOR_SYMBOLS.fetch(text.getbyte(position)))
-        position += 1
       else
         position += 1
       end
@@ -215,65 +259,76 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
 
     builder.finish!
 
-    [builder.compounds, builder.combinators]
+    builder
+  ensure
+    @depth -= 1
   end
 
   def build_root(compounds, combinators)
-    compounds[1..].each_with_index.reduce(compounds.first) do |left, (right, i)|
-      COMBINATOR_CLASSES.fetch(combinators[i]).new(left, right)
+    root = compounds.first
+    index = 1
+
+    while index < compounds.length
+      root = COMBINATOR_CLASSES.fetch(combinators[index - 1]).new(root, compounds[index])
+      index += 1
     end
+
+    root
   end
 
-  def parse_pseudo(text, position, stop) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    return parse_pseudo_element(text, position, stop) if text.getbyte(position + 1) == COLON
+  def parse_pseudo(text, stop) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    return parse_pseudo_element(text, stop) if text.getbyte(@position + 1) == COLON
 
-    length = word_length(text, position + 1, stop)
-    return [position + 1, nil] if length.zero?
+    length = word_length(text, @position + 1, stop)
+    if length.zero?
+      @position += 1
+      return
+    end
 
-    name = text.byteslice(position + 1, length).downcase
-    position += 1 + length
+    name = text.byteslice(@position + 1, length)
+    name.downcase!
+    @position += 1 + length
 
-    return [position, Croissant::Selector::PseudoElement.new(name)] if legacy_pseudo_element?(name)
+    return Croissant::Selector::PseudoElement.new(name) if legacy_pseudo_element?(name)
 
     argument = nil
 
-    if text.getbyte(position) == LEFT_PAREN
-      return parse_functional_pseudo(text, position, stop, name) if FUNCTIONAL_PSEUDO_NAMES.include?(name)
-      return parse_nth_pseudo(text, position, stop, name) if NTH_PSEUDO_CLASSES.key?(name)
+    if text.getbyte(@position) == LEFT_PAREN
+      return parse_functional_pseudo(text, stop, name) if FUNCTIONAL_PSEUDO_NAMES.include?(name)
+      return parse_nth_pseudo(text, stop, name) if NTH_PSEUDO_CLASSES.key?(name)
 
-      argument, position = parse_argument(text, position, stop)
+      argument = parse_argument(text, stop)
     elsif STRUCTURAL_PSEUDO_CLASSES.key?(name)
-      return [position, STRUCTURAL_PSEUDO_CLASSES.fetch(name).new]
+      return STRUCTURAL_PSEUDO_CLASSES.fetch(name).new
     end
 
-    [position, Croissant::Selector::PseudoClass::Unknown.new(name, argument:)]
+    Croissant::Selector::PseudoClass::Unknown.new(name, argument:)
   end
 
-  def parse_pseudo_element(text, position, stop)
-    length = word_length(text, position + 2, stop)
-    return [position + 2, nil] if length.zero?
+  def parse_pseudo_element(text, stop)
+    length = word_length(text, @position + 2, stop)
+    if length.zero?
+      @position += 2
+      return
+    end
 
-    name = text.byteslice(position + 2, length).downcase
-    position += 2 + length
-    argument = nil
-    argument, position = parse_argument(text, position, stop) if text.getbyte(position) == LEFT_PAREN
+    name = text.byteslice(@position + 2, length)
+    @position += 2 + length
+    argument = parse_argument(text, stop) if text.getbyte(@position) == LEFT_PAREN
 
-    [position, Croissant::Selector::PseudoElement.new(name, argument:)]
+    Croissant::Selector::PseudoElement.new(name, argument:)
   end
 
-  def parse_functional_pseudo(text, position, stop, name)
-    argument, position = parse_argument(text, position, stop)
+  def parse_functional_pseudo(text, stop, name)
+    argument = parse_argument(text, stop)
 
-    selector =
-      if name == 'has'
-        arguments = split_selector_list(argument).filter_map { |part| parse_relative_selector(part) }
-        Croissant::Selector::PseudoClass::Functional::Has.new(arguments)
-      else
-        selectors = split_selector_list(argument).filter_map { |part| parse(part) }
-        FUNCTIONAL_PSEUDO_CLASSES.fetch(name).new(selectors)
-      end
-
-    [position, selector]
+    if name == 'has'
+      arguments = split_selector_list(argument).filter_map { |part| parse_relative_selector(part) }
+      Croissant::Selector::PseudoClass::Functional::Has.new(arguments)
+    else
+      selectors = split_selector_list(argument).filter_map { |part| parse(part) }
+      FUNCTIONAL_PSEUDO_CLASSES.fetch(name).new(selectors)
+    end
   end
 
   def parse_relative_selector(part)
@@ -284,18 +339,15 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
     selector && RELATIVE_CLASSES.fetch(symbol || :descendant).new(selector)
   end
 
-  def parse_nth_pseudo(text, position, stop, name)
-    argument, position = parse_argument(text, position, stop)
+  def parse_nth_pseudo(text, stop, name)
+    argument = parse_argument(text, stop)
     step, offset = parse_nth(argument)
 
-    selector =
-      if step
-        NTH_PSEUDO_CLASSES.fetch(name).new(step, offset)
-      else
-        Croissant::Selector::PseudoClass::Unknown.new(name, argument:)
-      end
-
-    [position, selector]
+    if step
+      NTH_PSEUDO_CLASSES.fetch(name).new(step, offset)
+    else
+      Croissant::Selector::PseudoClass::Unknown.new(name, argument:)
+    end
   end
 
   def parse_nth(argument)
@@ -322,6 +374,11 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
   end
 
   def split_selector_list(text) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    unless text.include?(',')
+      part = text.strip
+      return part.empty? ? [] : [part]
+    end
+
     parts = []
     start = 0
     depth = 0
@@ -347,68 +404,75 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
     parts.reject(&:empty?)
   end
 
-  def parse_attribute(text, position, stop) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    position = skip_whitespace(text, position, stop)
-    length = word_length(text, position, stop)
-    name = text.byteslice(position, length)
-    position = skip_whitespace(text, position + length, stop)
+  def parse_attribute(text, stop) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    @position = skip_whitespace(text, @position, stop)
+    length = word_length(text, @position, stop)
+    name = text.byteslice(@position, length)
+    @position = skip_whitespace(text, @position + length, stop)
 
-    operator, position = parse_attribute_operator(text, position, stop)
+    operator = parse_attribute_operator(text, stop)
     value = nil
 
     if operator
-      position = skip_whitespace(text, position, stop)
-      value, position = parse_attribute_value(text, position, stop)
-      position = skip_whitespace(text, position, stop)
+      @position = skip_whitespace(text, @position, stop)
+      value = parse_attribute_value(text, stop)
+      @position = skip_whitespace(text, @position, stop)
     end
 
-    case_insensitive, position = parse_attribute_flag(text, position, stop)
+    case_insensitive = parse_case_insensitive_flag?(text)
 
-    closing = text.byteindex(CLOSING_BRACKET, position)
-    attribute = Croissant::Selector::Simple::Attribute.new(
+    closing = text.byteindex(CLOSING_BRACKET, @position)
+    @position = closing ? closing + 1 : stop
+
+    Croissant::Selector::Simple::Attribute.new(
       name, operator: operator || :exists, value:, case_insensitive:
     )
-
-    [attribute, closing ? closing + 1 : stop]
   end
 
-  def parse_attribute_operator(text, position, stop)
-    return [nil, position] if position >= stop
+  def parse_attribute_operator(text, stop)
+    return if @position >= stop
 
-    pair = text.byteslice(position, 2)
-    return [ATTRIBUTE_OPERATORS[pair], position + 2] if pair && ATTRIBUTE_OPERATORS.key?(pair)
+    operator = text.byteslice(@position, 2)
+    operator = text.byteslice(@position, 1) unless ATTRIBUTE_OPERATORS.key?(operator)
+    return unless ATTRIBUTE_OPERATORS.key?(operator)
 
-    single = text.byteslice(position, 1)
-    return [ATTRIBUTE_OPERATORS[single], position + 1] if single && ATTRIBUTE_OPERATORS.key?(single)
-
-    [nil, position]
+    @position += operator.bytesize
+    ATTRIBUTE_OPERATORS[operator]
   end
 
-  def parse_attribute_value(text, position, stop) # rubocop:disable Metrics/AbcSize
-    byte = text.getbyte(position)
+  def parse_attribute_value(text, stop)
+    byte = text.getbyte(@position)
+    return parse_quoted_attribute_value(text, byte, stop) if QUOTE_BYTES.include?(byte)
 
-    if QUOTE_BYTES.include?(byte)
-      closing = text.byteindex(byte.chr, position + 1) || stop
-      [text.byteslice(position + 1, closing - position - 1), closing + 1]
-    else
-      length = 0
-      length += 1 while position + length < stop && !attribute_value_boundary?(text.getbyte(position + length))
-      [text.byteslice(position, length), position + length]
-    end
+    length = 0
+    length += 1 while @position + length < stop && !attribute_value_boundary?(text.getbyte(@position + length))
+    value = text.byteslice(@position, length)
+    @position += length
+
+    value
+  end
+
+  def parse_quoted_attribute_value(text, quote, stop)
+    closing = text.byteindex(quote.chr, @position + 1) || stop
+    value = text.byteslice(@position + 1, closing - @position - 1)
+    @position = closing + 1
+
+    value
   end
 
   def attribute_value_boundary?(byte)
     byte == RIGHT_BRACKET || WHITESPACE_BYTES.include?(byte)
   end
 
-  def parse_attribute_flag(text, position, _stop)
-    byte = text.getbyte(position)
-    return [false, position] unless byte && (CASE_INSENSITIVE_FLAG_BYTES + CASE_SENSITIVE_FLAG_BYTES).include?(byte)
+  def parse_case_insensitive_flag?(text)
+    byte = text.getbyte(@position)
+    return false unless byte && CASE_FLAG_BYTES.include?(byte)
 
-    next_byte = text.getbyte(position + 1)
-    return [false, position] if next_byte && next_byte != RIGHT_BRACKET && !WHITESPACE_BYTES.include?(next_byte)
+    next_byte = text.getbyte(@position + 1)
+    return false if next_byte && next_byte != RIGHT_BRACKET && !WHITESPACE_BYTES.include?(next_byte)
 
-    [CASE_INSENSITIVE_FLAG_BYTES.include?(byte), position + 1]
+    @position += 1
+    CASE_INSENSITIVE_FLAG_BYTES.include?(byte)
   end
 
   def skip_whitespace(text, position, stop)
@@ -416,13 +480,25 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
     position
   end
 
-  def parse_argument(text, position, stop)
-    closing = matching_paren_index(text, position + 1, stop)
+  def parse_argument(text, stop)
+    closing = matching_paren_index(text, @position + 1, stop)
+    argument = text.byteslice(@position + 1, closing - @position - 1)
+    @position = closing + 1
 
-    [text.byteslice(position + 1, closing - position - 1), closing + 1]
+    argument
   end
 
-  def matching_paren_index(text, position, stop) # rubocop:disable Metrics/MethodLength
+  def matching_paren_index(text, position, stop)
+    closing = text.byteindex(CLOSING_PAREN, position)
+    return stop unless closing
+
+    opening = text.byteindex(OPENING_PAREN, position)
+    return closing if opening.nil? || opening > closing
+
+    scan_matching_paren(text, position, stop)
+  end
+
+  def scan_matching_paren(text, position, stop) # rubocop:disable Metrics/MethodLength
     depth = 1
 
     while position < stop
@@ -441,14 +517,9 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
 
   def word_length(text, position, stop)
     start = position
-    position += 1 while position < stop && word_byte?(text.getbyte(position))
+    position += 1 while position < stop && WORD_BYTES[text.getbyte(position)]
 
     position - start
-  end
-
-  def word_byte?(byte)
-    LOWERCASE.cover?(byte) || UPPERCASE.cover?(byte) || DIGITS.cover?(byte) ||
-      byte == HYPHEN || byte == UNDERSCORE
   end
 
   def legacy_pseudo_element?(name)

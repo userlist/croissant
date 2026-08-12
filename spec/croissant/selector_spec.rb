@@ -39,6 +39,14 @@ RSpec.describe Croissant::Selector do
       expect(parse('custom-element::part(button)').to_s).to eq('custom-element::part(button)')
     end
 
+    it 'should render a pseudo-element name in lowercase' do
+      expect(parse('p::AFTER').to_s).to eq('p::after')
+    end
+
+    it 'should render an unknown pseudo-class name in lowercase' do
+      expect(parse('a:HOVER').to_s).to eq('a:hover')
+    end
+
     it 'should render an attribute selector with its operator, quoted value, and flag' do
       expect(parse('a[href^=foo i]').to_s).to eq('a[href^="foo" i]')
     end

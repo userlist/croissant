@@ -4,7 +4,7 @@ class Croissant::Selector::PseudoClass::Unknown < Croissant::Selector::PseudoCla
   attr_reader :name, :argument
 
   def initialize(name, argument: nil)
-    @name = name
+    @name = name.downcase
     @argument = argument
 
     super()
