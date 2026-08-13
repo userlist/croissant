@@ -129,13 +129,23 @@ RSpec.describe Croissant::Style::ResolvedStyle do
       expect(style.to_s).to eq('color:black;font-size:12px')
     end
 
-    it 'should sort properties alphabetically regardless of resolution order' do
+    it 'should emit properties in cascade order so later declarations win when re-parsed' do
       style = described_class.new([
-        build_rule('p', 'font-size', '12px'),
-        build_rule('p', 'color', 'black')
+        build_rule('.a', 'margin-top', '10px'),
+        build_rule('#b', 'margin', '0')
       ])
 
-      expect(style.to_s).to eq('color:black;font-size:12px')
+      expect(style.to_s).to eq('margin-top:10px;margin:0')
+    end
+
+    it 'should move an overridden property to the position of its winning declaration' do
+      style = described_class.new([
+        build_rule('p', 'margin', '0'),
+        build_rule('.a', 'margin-top', '5px'),
+        build_rule('#b', 'margin', '1px')
+      ])
+
+      expect(style.to_s).to eq('margin-top:5px;margin:1px')
     end
 
     it 'should return an empty string when no properties were resolved' do
@@ -154,7 +164,16 @@ RSpec.describe Croissant::Style::ResolvedStyle do
         build_rule('p', 'font-size', '12px')
       ])
 
-      expect(style.to_s).to eq('color:black !important;font-size:12px')
+      expect(style.to_s).to eq('font-size:12px;color:black !important')
+    end
+
+    it 'should emit important declarations after normal ones' do
+      style = described_class.new([
+        build_rule('.a', 'margin', '0', important: true),
+        build_rule('#b', 'margin-top', '10px')
+      ])
+
+      expect(style.to_s).to eq('margin-top:10px;margin:0 !important')
     end
   end
 

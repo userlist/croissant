@@ -19,6 +19,10 @@ class Croissant::Document
     @document = document
   end
 
+  def to_html
+    document.to_html
+  end
+
   def stylesheets
     document
       .xpath('.//style')

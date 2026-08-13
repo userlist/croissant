@@ -69,6 +69,13 @@ RSpec.describe Croissant::Style::RuleSet do
       expect(rule_set[element_for('<p class="intro"></p>')]).to eq([rule])
     end
 
+    it 'should not return a rule more than once when the element repeats a class token' do
+      rule = build_rule('.intro')
+      rule_set = described_class.new([rule])
+
+      expect(rule_set[element_for('<p class="intro intro"></p>')]).to eq([rule])
+    end
+
     it 'should return rules matched through different index buckets in source order' do
       rules = [build_rule('#main'), build_rule('p'), build_rule('.intro'), build_rule('[href]')]
       rule_set = described_class.new(rules)

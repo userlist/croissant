@@ -64,7 +64,7 @@ class Croissant::Style::RuleSet
   end
 
   def candidates_by_classes(element)
-    element.classes.flat_map { |c| @by_class.fetch(c, []) }
+    element.classes.uniq.flat_map { |c| @by_class.fetch(c, []) }
   end
 
   def candidates_by_ids(element)

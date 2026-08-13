@@ -8,13 +8,8 @@ class Croissant::Style::ResolvedStyle
 
     important, declarations = resolve_declarations(rules)
 
-    declarations.each do |declaration|
-      properties[declaration.property] = declaration
-    end
-
-    important.each do |declaration|
-      properties[declaration.property] = declaration
-    end
+    declarations.each { |declaration| store(declaration) }
+    important.each { |declaration| store(declaration) }
 
     freeze
   end
@@ -25,7 +20,7 @@ class Croissant::Style::ResolvedStyle
   end
 
   def to_s
-    properties.values.sort_by(&:property).join(';')
+    properties.values.join(';')
   end
 
   def freeze
@@ -44,6 +39,11 @@ class Croissant::Style::ResolvedStyle
   end
 
   private
+
+  def store(declaration)
+    properties.delete(declaration.property)
+    properties[declaration.property] = declaration
+  end
 
   def resolve_declarations(rules)
     rules

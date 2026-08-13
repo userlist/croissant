@@ -44,13 +44,19 @@ RSpec.describe Croissant::Document do
 
       expect(document.stylesheets.map(&:to_s)).to eq(['p{color:red}'])
     end
+  end
 
-    it 'should compose partial HTML with the inliner' do
-      document = described_class.parse('<style>p { color: red }</style><p>hi</p>')
+  describe '#to_html' do
+    it 'should serialize the document' do
+      document = described_class.parse('<html><head></head><body><p>hi</p></body></html>')
 
-      Croissant::Style::Inliner.new.inline(document)
+      expect(document.to_html).to include('<html>', '<body><p>hi</p></body>')
+    end
 
-      expect(document.document.at_css('p')['style']).to eq('color:red')
+    it 'should serialize a fragment without wrapper elements' do
+      document = described_class.parse('<p>hi</p>')
+
+      expect(document.to_html).to eq('<p>hi</p>')
     end
   end
 
@@ -117,14 +123,6 @@ RSpec.describe Croissant::Document do
       document = document_for('<html><body><p>hi</p></body></html>')
 
       expect(document.stylesheets).to be_empty
-    end
-
-    it 'should compose with the inliner' do
-      document = document_for('<html><head><style>p { color: red }</style></head><body><p>hi</p></body></html>')
-
-      Croissant::Style::Inliner.new.inline(document)
-
-      expect(document.document.at_css('p')['style']).to eq('color:red')
     end
   end
 end
