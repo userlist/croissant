@@ -510,7 +510,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
         expect(result).to eq(Croissant::Stylesheet::Rule.new(
           selector: nil,
           declarations: [Croissant::Stylesheet::Declaration.new(property: 'color', value: 'red')],
-          specificity: Croissant::Selector::Specificity.style_attribute
+          specificity: Croissant::Selector::Specificity.inline
         ))
       end
 

@@ -7,14 +7,14 @@ RSpec.describe Croissant::Selector::Specificity do
     Croissant::Stylesheet::Parser.parse_selector(value).specificity
   end
 
-  describe '.style_attribute' do
+  describe '.inline' do
     it 'should outrank any selector-based specificity' do
-      expect(described_class.style_attribute).to eq(described_class.new(1, 0, 0, 0))
+      expect(described_class.inline).to eq(described_class.new(1, 0, 0, 0))
     end
 
     # rubocop:disable RSpec/IdenticalEqualityAssertion
     it 'should memoize the instance' do
-      expect(described_class.style_attribute).to be(described_class.style_attribute)
+      expect(described_class.inline).to be(described_class.inline)
     end
     # rubocop:enable RSpec/IdenticalEqualityAssertion
   end
@@ -149,7 +149,7 @@ RSpec.describe Croissant::Selector::Specificity do
 
   describe '#<=>' do
     it 'should rank the style attribute above any selector' do
-      expect(described_class.style_attribute).to be > described_class.new(0, 100, 100, 100)
+      expect(described_class.inline).to be > described_class.new(0, 100, 100, 100)
     end
 
     it 'should rank ids above classes' do
@@ -175,7 +175,7 @@ RSpec.describe Croissant::Selector::Specificity do
         calculate('p'),
         calculate('#main'),
         calculate('.intro'),
-        described_class.style_attribute
+        described_class.inline
       ]
 
       expect(specificities.sort).to eq([

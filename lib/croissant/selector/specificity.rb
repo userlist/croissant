@@ -5,8 +5,8 @@ class Croissant::Selector::Specificity
 
   attr_reader :style, :ids, :classes, :elements
 
-  def self.style_attribute
-    @style_attribute ||= new(1, 0, 0, 0)
+  def self.inline
+    @inline ||= new(1, 0, 0, 0)
   end
 
   def self.zero

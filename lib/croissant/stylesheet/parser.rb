@@ -63,7 +63,7 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
 
   def parse_attribute(content)
     declarations = parse_declarations(content.to_s)
-    specificity = Croissant::Selector::Specificity.style_attribute
+    specificity = Croissant::Selector::Specificity.inline
 
     Croissant::Stylesheet::Rule.new(declarations:, specificity:)
   end
