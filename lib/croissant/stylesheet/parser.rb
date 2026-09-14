@@ -49,6 +49,10 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
     new.parse_selector(content)
   end
 
+  def self.parse_selector_list(content)
+    new.parse_selector_list(content)
+  end
+
   def initialize
     @selector_parser = Croissant::Selector::Parser.new
     @declaration_scanner = StringScanner.new('')
@@ -70,6 +74,11 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
 
   def parse_selector(content)
     selector_parser.parse(content)
+  end
+
+  # Parses a comma-separated selector list, e.g. "table, td".
+  def parse_selector_list(content)
+    split_segments(content.to_s).filter_map { |segment| parse_selector(segment) }
   end
 
   private
