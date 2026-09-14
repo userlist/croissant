@@ -12,11 +12,10 @@ RSpec.describe Croissant::Selector::Specificity do
       expect(described_class.inline).to eq(described_class.new(1, 0, 0, 0))
     end
 
-    # rubocop:disable RSpec/IdenticalEqualityAssertion
+    # rubocop:disable-next RSpec/IdenticalEqualityAssertion
     it 'should memoize the instance' do
       expect(described_class.inline).to be(described_class.inline)
     end
-    # rubocop:enable RSpec/IdenticalEqualityAssertion
   end
 
   describe 'calculation from a parsed selector' do
@@ -160,11 +159,10 @@ RSpec.describe Croissant::Selector::Specificity do
       expect(described_class.new(0, 0, 1, 0)).to be > described_class.new(0, 0, 0, 100)
     end
 
-    # rubocop:disable RSpec/IdenticalEqualityAssertion
+    # rubocop:disable-next RSpec/IdenticalEqualityAssertion
     it 'should treat matching tiers as equal' do
       expect(described_class.new(0, 1, 2, 3)).to eq(described_class.new(0, 1, 2, 3))
     end
-    # rubocop:enable RSpec/IdenticalEqualityAssertion
 
     it 'should be incomparable to other types' do
       expect(described_class.new(0, 0, 0, 1) <=> 'not a specificity').to be_nil
