@@ -23,6 +23,7 @@ class Croissant::Stylesheet
   end
 end
 
+require_relative 'stylesheet/parser'
 require_relative 'stylesheet/declaration'
 require_relative 'stylesheet/property'
 require_relative 'stylesheet/rule'

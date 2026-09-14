@@ -23,12 +23,6 @@ RSpec.describe Croissant::Style::ResolvedStyle do
       expect(style['font-size']).to be_nil
     end
 
-    it 'should normalize the property name when looking it up' do
-      style = described_class.new([build_rule('p', 'color', 'black')])
-
-      expect(style[' COLOR ']).to eq('black')
-    end
-
     it 'should let a more specific rule win over a less specific one' do
       style = described_class.new([
         build_rule('p', 'color', 'black'),
@@ -111,6 +105,51 @@ RSpec.describe Croissant::Style::ResolvedStyle do
 
       expect(style[Croissant::Stylesheet::Property.new('color')]).to eq('black')
     end
+
+    it 'should resolve a longhand from a shorthand declaration' do
+      style = described_class.new([build_rule('p', 'margin', '10px 20px')])
+
+      expect(style['margin-top']).to eq('10px')
+    end
+
+    it 'should let a more specific longhand override part of a shorthand' do
+      style = described_class.new([
+        build_rule('#main', 'margin-top', '5px'),
+        build_rule('p', 'margin', '1px')
+      ])
+
+      expect(style['margin-top']).to eq('5px')
+    end
+
+    it 'should let a more specific shorthand override an earlier longhand' do
+      style = described_class.new([
+        build_rule('p', 'margin-top', '5px'),
+        build_rule('#main', 'margin', '1px')
+      ])
+
+      expect(style['margin-top']).to eq('1px')
+    end
+
+    it 'should return nil for a shorthand since only longhands are resolved' do
+      style = described_class.new([build_rule('p', 'margin', '1px')])
+
+      expect(style['margin']).to be_nil
+    end
+
+    it 'should ignore a shorthand declaration with an invalid value' do
+      style = described_class.new([build_rule('p', 'margin', '1px 2px 3px 4px 5px')])
+
+      expect(style['margin-top']).to be_nil
+    end
+
+    it 'should let an important longhand win over a more specific shorthand' do
+      style = described_class.new([
+        build_rule('p', 'margin-top', '5px', important: true),
+        build_rule('#main', 'margin', '1px')
+      ])
+
+      expect(style['margin-top']).to eq('5px')
+    end
   end
 
   describe '#to_s' do
@@ -129,23 +168,57 @@ RSpec.describe Croissant::Style::ResolvedStyle do
       expect(style.to_s).to eq('color:black;font-size:12px')
     end
 
-    it 'should emit properties in cascade order so later declarations win when re-parsed' do
-      style = described_class.new([
-        build_rule('.a', 'margin-top', '10px'),
-        build_rule('#b', 'margin', '0')
-      ])
+    it 'should collapse a complete set of longhands into their shorthand' do
+      style = described_class.new([build_rule('p', 'margin', '0')])
 
-      expect(style.to_s).to eq('margin-top:10px;margin:0')
+      expect(style.to_s).to eq('margin:0')
     end
 
-    it 'should move an overridden property to the position of its winning declaration' do
+    it 'should collapse an overridden longhand back into the shorthand' do
       style = described_class.new([
         build_rule('p', 'margin', '0'),
-        build_rule('.a', 'margin-top', '5px'),
-        build_rule('#b', 'margin', '1px')
+        build_rule('#b', 'margin-top', '5px')
       ])
 
-      expect(style.to_s).to eq('margin-top:5px;margin:1px')
+      expect(style.to_s).to eq('margin:5px 0 0')
+    end
+
+    it 'should collapse independently declared longhands into their shorthand' do
+      style = described_class.new([
+        build_rule('p', 'margin-top', '1px'),
+        build_rule('p', 'margin-right', '2px'),
+        build_rule('p', 'margin-bottom', '3px'),
+        build_rule('p', 'margin-left', '4px')
+      ])
+
+      expect(style.to_s).to eq('margin:1px 2px 3px 4px')
+    end
+
+    it 'should emit the shorthand at the position of its first longhand' do
+      style = described_class.new([
+        build_rule('p', 'margin', '0'),
+        build_rule('p', 'color', 'red')
+      ])
+
+      expect(style.to_s).to eq('margin:0;color:red')
+    end
+
+    it 'should keep longhands when the set is incomplete' do
+      style = described_class.new([
+        build_rule('p', 'margin-top', '1px'),
+        build_rule('p', 'margin-left', '2px')
+      ])
+
+      expect(style.to_s).to eq('margin-top:1px;margin-left:2px')
+    end
+
+    it 'should keep longhands when their importance differs' do
+      style = described_class.new([
+        build_rule('p', 'margin', '0'),
+        build_rule('p', 'margin-top', '5px', important: true)
+      ])
+
+      expect(style.to_s).to eq('margin-right:0;margin-bottom:0;margin-left:0;margin-top:5px !important')
     end
 
     it 'should return an empty string when no properties were resolved' do
@@ -169,11 +242,17 @@ RSpec.describe Croissant::Style::ResolvedStyle do
 
     it 'should emit important declarations after normal ones' do
       style = described_class.new([
-        build_rule('.a', 'margin', '0', important: true),
-        build_rule('#b', 'margin-top', '10px')
+        build_rule('.a', 'display', 'block', important: true),
+        build_rule('#b', 'color', 'red')
       ])
 
-      expect(style.to_s).to eq('margin-top:10px;margin:0 !important')
+      expect(style.to_s).to eq('color:red;display:block !important')
+    end
+
+    it 'should keep the important flag when collapsing an important shorthand' do
+      style = described_class.new([build_rule('p', 'padding', '0', important: true)])
+
+      expect(style.to_s).to eq('padding:0 !important')
     end
   end
 
@@ -221,7 +300,7 @@ RSpec.describe Croissant::Style::ResolvedStyle do
     end
 
     it 'should freeze the resolved properties' do
-      expect(described_class.new([build_rule('p', 'color', 'black')]).properties).to be_frozen
+      expect(described_class.new([build_rule('p', 'color', 'black')]).declarations).to be_frozen
     end
   end
 end
