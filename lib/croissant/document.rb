@@ -76,7 +76,7 @@ class Croissant::Document
   # Indexes the inlinable rules of all stylesheets. Built afresh on every
   # call.
   def rule_set
-    Croissant::Style::RuleSet.new(stylesheets.flat_map(&:rules).select(&:inlinable?))
+    @rule_set ||= Croissant::Style::RuleSet.new(stylesheets.flat_map(&:rules).select(&:inlinable?))
   end
 
   # The inlinable stylesheet rules matching an element, in source order.
