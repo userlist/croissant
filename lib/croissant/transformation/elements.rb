@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
 # Walks the document once and runs every matching element transformation on
-# each element, in pipeline order. After the transformations ran for an
-# element, its working style is written back to the style attribute if any of
-# them changed it.
+# each element, in pipeline order.
 class Croissant::Transformation::Elements < Croissant::Transformation
   attr_reader :transformations
 
@@ -21,17 +19,15 @@ class Croissant::Transformation::Elements < Croissant::Transformation
   def call(document)
     return if @index.empty?
 
-    document.each_element do |node|
-      transformations = @index[node]
+    document.each_element do |element|
+      transformations = @index[element.node]
       next if transformations.empty?
 
       # A transformation registered under several selectors runs once, at the
       # position of its first matching selector.
       transformations.uniq!
 
-      Croissant::Document::Element.new(document, node) do |element|
-        transformations.each { |transformation| transformation.call(element) }
-      end
+      transformations.each { |transformation| transformation.call(element) }
     end
   end
 end

@@ -7,14 +7,46 @@ class Croissant::Style::DeclarationSet
     @declarations = {}
 
     collections.each do |declarations|
-      declarations.each do |declaration|
-        @declarations.delete(declaration.property.name)
-        @declarations[declaration.property.name] = declaration
-      end
+      declarations.each { |declaration| add(declaration) }
+    end
+  end
+
+  # Adds a declaration, replacing an existing one of the same property and
+  # moving it to the end. A normal declaration never replaces an important
+  # one. Returns whether the declaration was added.
+  def add(declaration) # rubocop:disable Naming/PredicateMethod
+    name = declaration.property.name
+    existing = @declarations[name]
+
+    return false if existing&.important? && !declaration.important?
+
+    @declarations.delete(name) if existing
+    @declarations[name] = declaration
+    true
+  end
+
+  def <<(declaration)
+    add(declaration)
+    self
+  end
+
+  # Deletes the declaration of a property. Deleting a shorthand also deletes
+  # its longhands, so it works on expanded sets as well.
+  def delete(property)
+    property = Croissant::Style::Property.lookup(property)
+
+    @declarations.delete(property.name)
+
+    if property.is_a?(Croissant::Style::Property::Shorthand)
+      property.longhands.each { |longhand| @declarations.delete(longhand) }
     end
 
+    self
+  end
+
+  def freeze
     @declarations.freeze
-    freeze
+    super
   end
 
   def [](name)
@@ -34,11 +66,11 @@ class Croissant::Style::DeclarationSet
   end
 
   def merge(declarations)
-    self.class.new(self, declarations)
+    spawn(self, declarations)
   end
 
   def expand
-    self.class.new(flat_map { |declaration| declaration.property.expand(declaration) })
+    spawn(flat_map { |declaration| declaration.property.expand(declaration) })
   end
 
   def collapse
@@ -54,7 +86,7 @@ class Croissant::Style::DeclarationSet
       end
     end
 
-    self.class.new(replaced.values)
+    spawn(replaced.values)
   end
 
   def to_s
@@ -68,5 +100,13 @@ class Croissant::Style::DeclarationSet
 
   def hash
     [self.class, to_a].hash
+  end
+
+  private
+
+  def spawn(*collections)
+    set = self.class.new(*collections)
+    set.freeze if frozen?
+    set
   end
 end

@@ -28,6 +28,12 @@ RSpec.describe Croissant::Style::DeclarationSet do
       expect(set.map(&:to_s)).to eq(['color:red'])
     end
 
+    it 'should keep an important declaration over a later normal one' do
+      set = build_set(build_declaration('color', 'black', important: true), build_declaration('color', 'red'))
+
+      expect(set.map(&:to_s)).to eq(['color:black !important'])
+    end
+
     it 'should cascade several collections in order' do
       set = described_class.new(
         [build_declaration('color', 'black'), build_declaration('display', 'block')],
@@ -258,9 +264,174 @@ RSpec.describe Croissant::Style::DeclarationSet do
     end
   end
 
+  describe '#add' do
+    it 'should add the declaration' do
+      set = build_set(build_declaration('color', 'black'))
+      set.add(build_declaration('display', 'block'))
+
+      expect(set.map(&:to_s)).to eq(['color:black', 'display:block'])
+    end
+
+    it 'should replace an existing declaration of the same property and move it to the end' do
+      set = build_set(build_declaration('color', 'black'), build_declaration('display', 'block'))
+      set.add(build_declaration('color', 'red'))
+
+      expect(set.map(&:to_s)).to eq(['display:block', 'color:red'])
+    end
+
+    it 'should replace a normal declaration with an important one' do
+      set = build_set(build_declaration('color', 'black'))
+      set.add(build_declaration('color', 'red', important: true))
+
+      expect(set.map(&:to_s)).to eq(['color:red !important'])
+    end
+
+    it 'should replace an important declaration with another important one' do
+      set = build_set(build_declaration('color', 'black', important: true))
+      set.add(build_declaration('color', 'red', important: true))
+
+      expect(set.map(&:to_s)).to eq(['color:red !important'])
+    end
+
+    it 'should not replace an important declaration with a normal one' do
+      set = build_set(build_declaration('color', 'black', important: true), build_declaration('display', 'block'))
+      set.add(build_declaration('color', 'red'))
+
+      expect(set.map(&:to_s)).to eq(['color:black !important', 'display:block'])
+    end
+
+    it 'should return true when the declaration was added' do
+      expect(build_set.add(build_declaration('color', 'black'))).to be(true)
+    end
+
+    it 'should return false when the declaration was not added' do
+      set = build_set(build_declaration('color', 'black', important: true))
+
+      expect(set.add(build_declaration('color', 'red'))).to be(false)
+    end
+
+    it 'should raise when the set is frozen' do
+      set = build_set.freeze
+
+      expect { set.add(build_declaration('color', 'black')) }.to raise_error(FrozenError)
+    end
+  end
+
+  describe '#<<' do
+    it 'should add the declaration' do
+      set = build_set
+      set << build_declaration('color', 'black')
+
+      expect(set.map(&:to_s)).to eq(['color:black'])
+    end
+
+    it 'should return the set' do
+      set = build_set
+
+      expect(set << build_declaration('color', 'black')).to be(set)
+    end
+  end
+
+  describe '#delete' do
+    it 'should delete the declaration for the property' do
+      set = build_set(build_declaration('color', 'black'), build_declaration('display', 'block'))
+      set.delete('color')
+
+      expect(set.map(&:to_s)).to eq(['display:block'])
+    end
+
+    it 'should accept a property instance' do
+      set = build_set(build_declaration('color', 'black'))
+      set.delete(Croissant::Style::Property.lookup('color'))
+
+      expect(set).to be_empty
+    end
+
+    it 'should ignore unknown properties' do
+      set = build_set(build_declaration('color', 'black'))
+      set.delete('display')
+
+      expect(set.map(&:to_s)).to eq(['color:black'])
+    end
+
+    it 'should delete the longhands of a shorthand' do
+      set = build_set(build_declaration('margin', '1px')).expand
+      set.add(build_declaration('color', 'black'))
+      set.delete('margin')
+
+      expect(set.map(&:to_s)).to eq(['color:black'])
+    end
+
+    it 'should delete a shorthand declaration itself' do
+      set = build_set(build_declaration('margin', '1px'))
+      set.delete('margin')
+
+      expect(set).to be_empty
+    end
+
+    it 'should only delete the given longhand' do
+      set = build_set(build_declaration('margin', '1px')).expand
+      set.delete('margin-top')
+
+      expect(set.map(&:to_s)).to eq(['margin-right:1px', 'margin-bottom:1px', 'margin-left:1px'])
+    end
+
+    it 'should return the set' do
+      set = build_set(build_declaration('color', 'black'))
+
+      expect(set.delete('color')).to be(set)
+    end
+
+    it 'should raise when the set is frozen' do
+      set = build_set(build_declaration('color', 'black')).freeze
+
+      expect { set.delete('color') }.to raise_error(FrozenError)
+    end
+  end
+
   describe '#freeze' do
-    it 'should be frozen after initialization' do
-      expect(described_class.new).to be_frozen
+    it 'should not be frozen after initialization' do
+      expect(described_class.new).not_to be_frozen
+    end
+
+    it 'should freeze the result of #merge when frozen' do
+      expect(build_set.freeze.merge([build_declaration('color', 'black')])).to be_frozen
+    end
+
+    it 'should freeze the result of #expand when frozen' do
+      expect(build_set(build_declaration('margin', '10px')).freeze.expand).to be_frozen
+    end
+
+    it 'should freeze the result of #collapse when frozen' do
+      expect(build_set(build_declaration('margin', '10px')).freeze.expand.collapse).to be_frozen
+    end
+
+    it 'should freeze the result of #replace when frozen' do
+      set = build_set(build_declaration('color', 'black')).freeze
+
+      expect(set.replace(['color'], build_declaration('color', 'red'))).to be_frozen
+    end
+
+    it 'should not freeze the result of #merge when not frozen' do
+      expect(build_set.merge([build_declaration('color', 'black')])).not_to be_frozen
+    end
+
+    it 'should not freeze the result of #expand when not frozen' do
+      expect(build_set(build_declaration('margin', '10px')).expand).not_to be_frozen
+    end
+
+    it 'should not freeze the result of #replace when not frozen' do
+      set = build_set(build_declaration('color', 'black'))
+
+      expect(set.replace(['color'], build_declaration('color', 'red'))).not_to be_frozen
+    end
+
+    it 'should freeze the set' do
+      expect(described_class.new.freeze).to be_frozen
+    end
+
+    it 'should freeze the declarations' do
+      expect(described_class.new.freeze.instance_variable_get(:@declarations)).to be_frozen
     end
   end
 end
