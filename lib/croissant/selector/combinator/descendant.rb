@@ -4,7 +4,16 @@ class Croissant::Selector::Combinator::Descendant < Croissant::Selector::Combina
   def matches?(element)
     return false unless super
 
-    element.ancestors.any? { |ancestor| ancestor.element? && left.matches?(ancestor) }
+    ancestor = element.parent
+
+    # The walk ends at the document or fragment holding the tree.
+    while ancestor&.element?
+      return true if left.matches?(ancestor)
+
+      ancestor = ancestor.parent
+    end
+
+    false
   end
 
   def to_s
