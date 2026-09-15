@@ -28,9 +28,22 @@ class Croissant::Selector::Index
     self
   end
 
+  # The payloads whose selectors match the element, in registration order.
+  # Matches are collected in a single pass over the candidate buckets; every
+  # bucket is in registration order already, so a sort is only needed when
+  # more than one bucket contributed.
   def [](element)
-    matches = candidates(element).select { |entry| entry.selector.matches?(element) }
-    matches.sort_by!(&:order)
+    matches = []
+    contributing = 0
+
+    each_bucket(element) do |bucket|
+      size = matches.size
+      bucket.each { |entry| matches << entry if entry.selector.matches?(element) }
+      contributing += 1 if matches.size > size
+    end
+
+    # sort_by! would allocate a key pair per match.
+    matches.sort! { |a, b| a.order <=> b.order } if contributing > 1 # rubocop:disable Performance/CompareWithBlock
     matches.map!(&:payload)
   end
 
@@ -58,18 +71,35 @@ class Croissant::Selector::Index
     end
   end
 
-  def candidates(element)
-    candidates = @universal.dup
-    candidates.concat(@by_tag.fetch(element.name, [])) if element.name
-    candidates.concat(candidates_by_classes(element)) unless @by_class.empty?
-    candidates.concat(@by_id.fetch(element['id'], [])) if element['id']
-    candidates
+  # Yields the buckets the element could match. Every attribute is read from
+  # the element once: Nokogiri allocates a new string on each read.
+  def each_bucket(element, &)
+    yield @universal unless @universal.empty?
+
+    if (name = element.name) && (bucket = @by_tag[name])
+      yield bucket
+    end
+
+    each_class_bucket(element, &)
+
+    if (id = element['id']) && (bucket = @by_id[id])
+      yield bucket
+    end
   end
 
-  def candidates_by_classes(element)
-    classes = element.classes
-    return [] if classes.empty?
+  # Yields the bucket of every class of the element once, even when the
+  # element repeats a class.
+  def each_class_bucket(element)
+    return if @by_class.empty?
 
-    classes.uniq.flat_map { |name| @by_class.fetch(name, []) }
+    seen = nil
+
+    element.classes.each do |name|
+      bucket = @by_class[name]
+      next if bucket.nil? || seen&.include?(bucket)
+
+      (seen ||= []) << bucket
+      yield bucket
+    end
   end
 end

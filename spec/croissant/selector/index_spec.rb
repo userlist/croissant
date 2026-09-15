@@ -65,6 +65,25 @@ RSpec.describe Croissant::Selector::Index do
       expect(index[element_for('<p class="a a"></p>')]).to eq([:a])
     end
 
+    it 'should find payloads for classes separated by any whitespace' do
+      index = build([[:a, '.a'], [:b, '.b']])
+
+      expect(index[element_for("<p class=\" a\t\nb \"></p>")]).to eq(%i[a b])
+    end
+
+    it 'should keep registration order across several class buckets' do
+      index = build([[:b, '.b'], [:a, '.a']])
+
+      expect(index[element_for('<p class="a b"></p>')]).to eq(%i[b a])
+    end
+
+    it 'should match descendants through a parent walk' do
+      index = build([[:nested, 'div p']])
+      element = element_for('<div><section><p></p></section></div>').at_css('p')
+
+      expect(index[element]).to eq([:nested])
+    end
+
     it 'should return an empty array for an empty index' do
       expect(described_class.new[element_for('<p></p>')]).to eq([])
     end

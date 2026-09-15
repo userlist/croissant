@@ -166,6 +166,24 @@ RSpec.describe Croissant::Selector do
       expect(parse('.intro')).not_to be_matches(element)
     end
 
+    it 'should match a class anywhere in a whitespace-separated class list' do
+      element = element_for("<p class=\"a\tintro\nb\"></p>", 'p')
+
+      expect(parse('.intro')).to be_matches(element)
+    end
+
+    it 'should not match a class that is only a substring of another' do
+      element = element_for('<p class="introduction pre-intro"></p>', 'p')
+
+      expect(parse('.intro')).not_to be_matches(element)
+    end
+
+    it 'should not match a class against an element without a class attribute' do
+      element = element_for('<p></p>', 'p')
+
+      expect(parse('.intro')).not_to be_matches(element)
+    end
+
     it 'should match an attribute selector by operator' do
       element = element_for('<a href="https://example.com"></a>', 'a')
 
