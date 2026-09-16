@@ -20,9 +20,6 @@ class Croissant::Document
     @parser = Croissant::Stylesheet::Parser.new
     @nodes = {}.compare_by_identity
 
-    @stylesheets = nil
-    @rule_set = nil
-
     reload
   end
 
@@ -74,15 +71,11 @@ class Croissant::Document
   end
 
   def style_for(element)
-    declarations = Croissant::Style::Cascade.resolve(*inline_rules_for(element))
-
-    Croissant::Style::ElementStyle.new(declarations)
+    Croissant::Style::ElementStyle.new(cascade.resolve(*inline_rules_for(element)))
   end
 
   def computed_style_for(element)
-    declarations = Croissant::Style::Cascade.resolve(*rules_for(element), *inline_rules_for(element))
-
-    Croissant::Style::ElementStyle.new(declarations)
+    Croissant::Style::ElementStyle.new(cascade.resolve(*rules_for(element), *inline_rules_for(element)))
   end
 
   def create_node(name)
@@ -105,18 +98,20 @@ class Croissant::Document
 
   def reload
     @stylesheets = xpath('.//style').map { |element| parser.parse(element.content) }
+    @rules = Croissant::Selector::Index.new { |index| inlinable_rules.each { |rule| index.add(rule.selector, rule) } }
+    @cascade = Croissant::Style::Cascade.new(inlinable_rules)
   end
 
   private
 
-  attr_reader :document, :parser
+  attr_reader :document, :parser, :cascade
 
-  def rule_set
-    @rule_set ||= Croissant::Style::RuleSet.new(stylesheets.flat_map(&:rules).select(&:inlinable?))
+  def inlinable_rules
+    stylesheets.flat_map(&:rules).select(&:inlinable?)
   end
 
   def rules_for(element)
-    rule_set[element]
+    @rules[element]
   end
 
   def inline_rules_for(element)

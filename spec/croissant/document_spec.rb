@@ -331,4 +331,31 @@ RSpec.describe Croissant::Document do
       expect(document.stylesheets).to be_empty
     end
   end
+
+  describe '#reload' do
+    def build
+      document = document_for('<html><head></head><body><p></p></body></html>')
+      style = document.create_node('style')
+      style.content = 'p { color: red }'
+
+      [document, document.at_xpath('/html/body/p'), style]
+    end
+
+    it 'should pick up stylesheets added since parsing' do
+      document, _element, style = build
+      document.head.add_child(style)
+      document.reload
+
+      expect(document.stylesheets.size).to eq(1)
+    end
+
+    it 'should apply rules from stylesheets added since parsing' do
+      document, element, style = build
+      document.computed_style_for(element)
+      document.head.add_child(style)
+      document.reload
+
+      expect(document.computed_style_for(element)['color']).to eq('red')
+    end
+  end
 end

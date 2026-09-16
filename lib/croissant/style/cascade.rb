@@ -1,23 +1,57 @@
 # frozen_string_literal: true
 
-module Croissant::Style::Cascade
-  class << self
-    def resolve(*rules)
-      declarations = rules
-        .sort_by!
-        .with_index { |rule, index| [rule.specificity, index] }
-        .flat_map(&:declarations)
-        .map { |declaration| build_declaration(declaration) }
+class Croissant::Style::Cascade
+  def self.resolve(*rules)
+    new.resolve(*rules)
+  end
 
-      Croissant::Style::DeclarationSet.new(declarations).expand
+  def initialize(rules = [])
+    @declarations = rules.to_h { |rule| [rule, prepare(rule).freeze] }.compare_by_identity.freeze
+
+    freeze
+  end
+
+  def resolve(*rules)
+    set = Croissant::Style::DeclarationSet.new
+
+    sort(rules).each do |rule|
+      declarations_for(rule).each { |declaration| set.add(declaration) }
     end
 
-    private
+    set
+  end
 
-    def build_declaration(declaration)
-      return declaration if declaration.is_a?(Croissant::Style::Declaration)
+  def declarations_for(rule)
+    @declarations[rule] || prepare(rule)
+  end
 
-      Croissant::Style::Declaration.new(declaration.property, declaration.value, important: declaration.important?)
+  private
+
+  def prepare(rule)
+    rule.declarations.flat_map do |declaration|
+      declaration = build_declaration(declaration)
+      declaration.property.expand(declaration)
     end
+  end
+
+  def build_declaration(declaration)
+    return declaration if declaration.is_a?(Croissant::Style::Declaration)
+
+    Croissant::Style::Declaration.new(declaration.property, declaration.value, important: declaration.important?)
+  end
+
+  def sort(rules)
+    (1...rules.size).each do |index|
+      rule = rules[index]
+
+      while index.positive? && (rules[index - 1].specificity <=> rule.specificity).positive?
+        rules[index] = rules[index - 1]
+        index -= 1
+      end
+
+      rules[index] = rule
+    end
+
+    rules
   end
 end
