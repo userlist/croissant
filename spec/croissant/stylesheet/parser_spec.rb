@@ -49,7 +49,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       end
 
       it 'should expose the selector specificity on the rule' do
-        expect(rules.first.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 0, 1))
+        expect(rules.first.specificity).to eq(Croissant::Selector::Specificity.element)
       end
     end
 
@@ -87,8 +87,8 @@ RSpec.describe Croissant::Stylesheet::Parser do
       it 'should assign each selector its own specificity' do
         expect(rules.map(&:specificity))
           .to eq([
-            Croissant::Selector::Specificity.new(0, 0, 1, 1),
-            Croissant::Selector::Specificity.new(0, 1, 0, 0)
+            Croissant::Selector::Specificity.class_name + Croissant::Selector::Specificity.element,
+            Croissant::Selector::Specificity.id
           ])
       end
 
@@ -516,7 +516,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
 
       it 'should have a specificity above any selector' do
         expect(result.specificity)
-          .to eq(Croissant::Selector::Specificity.new(1, 0, 0, 0))
+          .to eq(Croissant::Selector::Specificity.inline)
       end
 
       it 'should be inlinable' do
@@ -639,7 +639,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       end
 
       it 'should count the class' do
-        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 1, 1))
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.class_name + Croissant::Selector::Specificity.element)
       end
 
       it 'should be inlinable' do
@@ -651,7 +651,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'h1' }
 
       it 'should return a selector counting the element' do
-        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 0, 1))
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.element)
       end
     end
 
@@ -659,7 +659,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { '.intro' }
 
       it 'should return a selector counting the class' do
-        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 1, 0))
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.class_name)
       end
     end
 
@@ -667,7 +667,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { '#main' }
 
       it 'should return a selector counting the ID' do
-        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 1, 0, 0))
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.id)
       end
     end
 
@@ -675,7 +675,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'a[href^="https://"]' }
 
       it 'should return a selector counting the attribute as a class' do
-        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 1, 1))
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.class_name + Croissant::Selector::Specificity.element)
       end
     end
 
@@ -683,7 +683,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'a:hover' }
 
       it 'should return a selector counting the pseudo-class as a class' do
-        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 1, 1))
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.class_name + Croissant::Selector::Specificity.element)
       end
 
       it 'should not be inlinable' do
@@ -695,7 +695,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'p::after' }
 
       it 'should return a selector counting the pseudo-element as an element' do
-        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 0, 0, 2))
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.element + Croissant::Selector::Specificity.element)
       end
 
       it 'should not be inlinable' do
@@ -707,7 +707,7 @@ RSpec.describe Croissant::Stylesheet::Parser do
       let(:value) { 'div#main.content > p.intro:first-child::after' }
 
       it 'should return a selector summing each component across the whole selector' do
-        expect(result.specificity).to eq(Croissant::Selector::Specificity.new(0, 1, 3, 3))
+        expect(result.specificity).to eq(Croissant::Selector::Specificity.build(0, 1, 3, 3))
       end
 
       it 'should not be inlinable' do

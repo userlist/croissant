@@ -3,72 +3,89 @@
 class Croissant::Selector::Specificity
   include Comparable
 
-  attr_reader :style, :ids, :classes, :elements
+  BUCKET_BITS = 8
+  BUCKET_SIZE = 1 << BUCKET_BITS
+  BUCKET_MASK = BUCKET_SIZE - 1
 
-  def self.inline
-    @inline ||= new(1, 0, 0, 0)
+  ELEMENT_SHIFT = 0
+  CLASS_SHIFT = BUCKET_BITS
+  ID_SHIFT = BUCKET_BITS * 2
+  STYLE_SHIFT = BUCKET_BITS * 3
+
+  class << self
+    def build(style, ids, classes, elements)
+      new(
+        (style << STYLE_SHIFT) +
+          (ids << ID_SHIFT) +
+          (classes << CLASS_SHIFT) +
+          (elements << ELEMENT_SHIFT)
+      )
+    end
+
+    def inline
+      @inline ||= build(1, 0, 0, 0)
+    end
+
+    def zero
+      @zero ||= build(0, 0, 0, 0)
+    end
+
+    def id
+      @id ||= build(0, 1, 0, 0)
+    end
+
+    def class_name
+      @class_name ||= build(0, 0, 1, 0)
+    end
+
+    def element
+      @element ||= build(0, 0, 0, 1)
+    end
   end
 
-  def self.zero
-    @zero ||= new(0, 0, 0, 0)
-  end
-
-  def self.id
-    @id ||= new(0, 1, 0, 0)
-  end
-
-  def self.class_name
-    @class_name ||= new(0, 0, 1, 0)
-  end
-
-  def self.element
-    @element ||= new(0, 0, 0, 1)
-  end
-
-  def initialize(style, ids, classes, elements)
-    @style = style
-    @ids = ids
-    @classes = classes
-    @elements = elements
+  def initialize(value)
+    @value = value
 
     freeze
   end
 
-  def <=>(other)
-    return unless other.is_a?(self.class)
+  def style
+    @value >> STYLE_SHIFT
+  end
 
-    compare(:style, other) || compare(:ids, other) || compare(:classes, other) || (elements <=> other.elements)
+  def ids
+    (@value >> ID_SHIFT) & BUCKET_MASK
+  end
+
+  def classes
+    (@value >> CLASS_SHIFT) & BUCKET_MASK
+  end
+
+  def elements
+    (@value >> ELEMENT_SHIFT) & BUCKET_MASK
+  end
+
+  def <=>(other)
+    @value <=> other.to_i if other.is_a?(self.class)
   end
 
   def +(other)
-    self.class.new(
-      style + other.style,
-      ids + other.ids,
-      classes + other.classes,
-      elements + other.elements
-    )
+    self.class.new(@value + other.to_i)
   end
 
   def eql?(other)
-    other.is_a?(self.class) &&
-      style == other.style &&
-      ids == other.ids &&
-      classes == other.classes &&
-      elements == other.elements
+    other.is_a?(self.class) && @value == other.to_i
   end
 
   def hash
-    [self.class, style, ids, classes, elements].hash
+    [self.class, @value].hash
+  end
+
+  def to_i
+    @value
   end
 
   def inspect
     "<#{self.class} [#{style}, #{ids}, #{classes}, #{elements}]>"
-  end
-
-  private
-
-  def compare(field, other)
-    result = public_send(field) <=> other.public_send(field)
-    result unless result.zero?
   end
 end

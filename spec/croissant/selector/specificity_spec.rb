@@ -9,7 +9,7 @@ RSpec.describe Croissant::Selector::Specificity do
 
   describe '.inline' do
     it 'should outrank any selector-based specificity' do
-      expect(described_class.inline).to eq(described_class.new(1, 0, 0, 0))
+      expect(described_class.inline).to eq(described_class.build(1, 0, 0, 0))
     end
 
     it 'should memoize the instance' do
@@ -26,7 +26,7 @@ RSpec.describe Croissant::Selector::Specificity do
       let(:selector) { 'p' }
 
       it 'should count the element' do
-        expect(result).to eq(described_class.new(0, 0, 0, 1))
+        expect(result).to eq(described_class.build(0, 0, 0, 1))
       end
     end
 
@@ -34,7 +34,7 @@ RSpec.describe Croissant::Selector::Specificity do
       let(:selector) { '.intro' }
 
       it 'should count the class' do
-        expect(result).to eq(described_class.new(0, 0, 1, 0))
+        expect(result).to eq(described_class.build(0, 0, 1, 0))
       end
     end
 
@@ -42,7 +42,7 @@ RSpec.describe Croissant::Selector::Specificity do
       let(:selector) { '#main' }
 
       it 'should count the id' do
-        expect(result).to eq(described_class.new(0, 1, 0, 0))
+        expect(result).to eq(described_class.build(0, 1, 0, 0))
       end
     end
 
@@ -50,7 +50,7 @@ RSpec.describe Croissant::Selector::Specificity do
       let(:selector) { 'a[href^="https://"]' }
 
       it 'should count the attribute as a class and the tag as an element' do
-        expect(result).to eq(described_class.new(0, 0, 1, 1))
+        expect(result).to eq(described_class.build(0, 0, 1, 1))
       end
     end
 
@@ -58,7 +58,7 @@ RSpec.describe Croissant::Selector::Specificity do
       let(:selector) { 'a:hover' }
 
       it 'should count the pseudo-class as a class' do
-        expect(result).to eq(described_class.new(0, 0, 1, 1))
+        expect(result).to eq(described_class.build(0, 0, 1, 1))
       end
     end
 
@@ -66,7 +66,7 @@ RSpec.describe Croissant::Selector::Specificity do
       let(:selector) { 'p::after' }
 
       it 'should count the pseudo-element as an element' do
-        expect(result).to eq(described_class.new(0, 0, 0, 2))
+        expect(result).to eq(described_class.build(0, 0, 0, 2))
       end
     end
 
@@ -74,7 +74,7 @@ RSpec.describe Croissant::Selector::Specificity do
       let(:selector) { '#a#b' }
 
       it 'should count each id' do
-        expect(result).to eq(described_class.new(0, 2, 0, 0))
+        expect(result).to eq(described_class.build(0, 2, 0, 0))
       end
     end
 
@@ -82,7 +82,7 @@ RSpec.describe Croissant::Selector::Specificity do
       let(:selector) { 'div#main.content > p.intro:first-child::after' }
 
       it 'should sum each component across the whole selector' do
-        expect(result).to eq(described_class.new(0, 1, 3, 3))
+        expect(result).to eq(described_class.build(0, 1, 3, 3))
       end
     end
 
@@ -90,13 +90,13 @@ RSpec.describe Croissant::Selector::Specificity do
       it 'should take on the specificity of a class argument' do
         result = calculate('a:not(.foo)')
 
-        expect(result).to eq(described_class.new(0, 0, 1, 1))
+        expect(result).to eq(described_class.build(0, 0, 1, 1))
       end
 
       it 'should take on the specificity of an id argument' do
         result = calculate('a:not(#foo)')
 
-        expect(result).to eq(described_class.new(0, 1, 0, 1))
+        expect(result).to eq(described_class.build(0, 1, 0, 1))
       end
     end
 
@@ -104,7 +104,7 @@ RSpec.describe Croissant::Selector::Specificity do
       it 'should take on the specificity of the most specific argument' do
         result = calculate(':is(.a, #b)')
 
-        expect(result).to eq(described_class.new(0, 1, 0, 0))
+        expect(result).to eq(described_class.build(0, 1, 0, 0))
       end
     end
 
@@ -112,7 +112,7 @@ RSpec.describe Croissant::Selector::Specificity do
       it "should take on its argument's specificity" do
         result = calculate('div:has(.child)')
 
-        expect(result).to eq(described_class.new(0, 0, 1, 1))
+        expect(result).to eq(described_class.build(0, 0, 1, 1))
       end
     end
 
@@ -120,7 +120,7 @@ RSpec.describe Croissant::Selector::Specificity do
       it 'should always contribute zero specificity' do
         result = calculate(':where(#foo)')
 
-        expect(result).to eq(described_class.new(0, 0, 0, 0))
+        expect(result).to eq(described_class.build(0, 0, 0, 0))
       end
     end
 
@@ -128,13 +128,13 @@ RSpec.describe Croissant::Selector::Specificity do
       it 'should resolve specificity through the nesting' do
         result = calculate('a:not(:is(.a, .b))')
 
-        expect(result).to eq(described_class.new(0, 0, 1, 1))
+        expect(result).to eq(described_class.build(0, 0, 1, 1))
       end
 
       it 'should still contribute zero when :where() wraps the nested argument' do
         result = calculate('a:not(:where(#foo))')
 
-        expect(result).to eq(described_class.new(0, 0, 0, 1))
+        expect(result).to eq(described_class.build(0, 0, 0, 1))
       end
     end
 
@@ -142,32 +142,114 @@ RSpec.describe Croissant::Selector::Specificity do
       it 'should sum each independently' do
         result = calculate('a:not(.foo):is(#bar, .baz)')
 
-        expect(result).to eq(described_class.new(0, 1, 1, 1))
+        expect(result).to eq(described_class.build(0, 1, 1, 1))
       end
+    end
+  end
+
+  describe 'packing' do
+    it 'should pack each tier into its own byte' do
+      specificity = described_class.build(1, 2, 3, 4)
+
+      expect(specificity.to_i).to eq((1 << 24) + (2 << 16) + (3 << 8) + 4)
+    end
+
+    it 'should use the same bucket size as browsers' do
+      expect(described_class::BUCKET_SIZE).to eq(256)
+    end
+
+    it 'should take the packed value directly' do
+      specificity = described_class.new((2 << 16) + 1)
+
+      expect(specificity).to eq(described_class.build(0, 2, 0, 1))
+    end
+
+    it 'should freeze instances' do
+      expect(described_class.new(0)).to be_frozen
+    end
+
+    describe 'extracting the tiers back out' do
+      let(:specificity) { described_class.build(1, 2, 3, 4) }
+
+      it 'should extract the style count' do
+        expect(specificity.style).to eq(1)
+      end
+
+      it 'should extract the id count' do
+        expect(specificity.ids).to eq(2)
+      end
+
+      it 'should extract the class count' do
+        expect(specificity.classes).to eq(3)
+      end
+
+      it 'should extract the element count' do
+        expect(specificity.elements).to eq(4)
+      end
+    end
+
+    describe 'a full bucket' do
+      let(:specificity) { described_class.build(0, 0, 0, 255) }
+
+      it 'should keep the count in its own tier' do
+        expect(specificity.elements).to eq(255)
+      end
+
+      it 'should not bleed into the next tier' do
+        expect(specificity.classes).to be_zero
+      end
+
+      it 'should still rank below the next tier' do
+        expect(specificity).to be < described_class.build(0, 0, 1, 0)
+      end
+    end
+  end
+
+  describe '#+' do
+    it 'should sum each tier' do
+      result = described_class.build(0, 1, 2, 3) + described_class.build(1, 3, 2, 1)
+
+      expect(result).to eq(described_class.build(1, 4, 4, 4))
+    end
+  end
+
+  describe '#eql?' do
+    let(:specificity) { described_class.build(0, 1, 2, 3) }
+
+    it 'should treat equal packed values as eql' do
+      expect(specificity).to eql(described_class.build(0, 1, 2, 3))
+    end
+
+    it 'should not be eql to the bare packed value' do
+      expect(specificity).not_to eql(specificity.to_i)
+    end
+
+    it 'should hash equal instances alike' do
+      expect(described_class.build(0, 1, 2, 3).hash).to eq(specificity.hash)
     end
   end
 
   describe '#<=>' do
     it 'should rank the style attribute above any selector' do
-      expect(described_class.inline).to be > described_class.new(0, 100, 100, 100)
+      expect(described_class.inline).to be > described_class.build(0, 100, 100, 100)
     end
 
     it 'should rank ids above classes' do
-      expect(described_class.new(0, 1, 0, 0)).to be > described_class.new(0, 0, 100, 100)
+      expect(described_class.build(0, 1, 0, 0)).to be > described_class.build(0, 0, 100, 100)
     end
 
     it 'should rank classes above elements' do
-      expect(described_class.new(0, 0, 1, 0)).to be > described_class.new(0, 0, 0, 100)
+      expect(described_class.build(0, 0, 1, 0)).to be > described_class.build(0, 0, 0, 100)
     end
 
     it 'should treat matching tiers as equal' do
-      specificity = described_class.new(0, 1, 2, 3)
+      specificity = described_class.build(0, 1, 2, 3)
 
-      expect(described_class.new(0, 1, 2, 3)).to eq(specificity)
+      expect(described_class.build(0, 1, 2, 3)).to eq(specificity)
     end
 
     it 'should be incomparable to other types' do
-      expect(described_class.new(0, 0, 0, 1) <=> 'not a specificity').to be_nil
+      expect(described_class.build(0, 0, 0, 1) <=> 'not a specificity').to be_nil
     end
 
     it 'should sort selectors from lowest to highest specificity' do
@@ -179,10 +261,10 @@ RSpec.describe Croissant::Selector::Specificity do
       ]
 
       expect(specificities.sort).to eq([
-        described_class.new(0, 0, 0, 1),
-        described_class.new(0, 0, 1, 0),
-        described_class.new(0, 1, 0, 0),
-        described_class.new(1, 0, 0, 0)
+        described_class.build(0, 0, 0, 1),
+        described_class.build(0, 0, 1, 0),
+        described_class.build(0, 1, 0, 0),
+        described_class.build(1, 0, 0, 0)
       ])
     end
   end

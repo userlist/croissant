@@ -20,17 +20,11 @@ class Croissant::Selector::Compound < Croissant::Selector
   end
 
   def specificity
-    style = ids = classes = elements = 0
+    value = 0
 
-    selectors.each do |selector|
-      specificity = selector.specificity
-      style += specificity.style
-      ids += specificity.ids
-      classes += specificity.classes
-      elements += specificity.elements
-    end
+    selectors.each { |selector| value += selector.specificity.to_i }
 
-    Croissant::Selector::Specificity.new(style, ids, classes, elements)
+    Croissant::Selector::Specificity.new(value)
   end
 
   def to_s
