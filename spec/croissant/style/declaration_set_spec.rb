@@ -219,6 +219,37 @@ RSpec.describe Croissant::Style::DeclarationSet do
     end
   end
 
+  describe '#each' do
+    it 'should yield the declarations in insertion order' do
+      set = build_set(build_declaration('color', 'black'), build_declaration('display', 'block'))
+
+      expect(set.map(&:to_s)).to eq(['color:black', 'display:block'])
+    end
+
+    it 'should yield important declarations after normal ones' do
+      set = build_set(build_declaration('color', 'black', important: true), build_declaration('display', 'block'))
+
+      expect(set.map(&:to_s)).to eq(['display:block', 'color:black !important'])
+    end
+
+    it 'should keep the insertion order within the normal and the important declarations' do
+      set = build_set(
+        build_declaration('color', 'black', important: true),
+        build_declaration('display', 'block'),
+        build_declaration('margin-top', '1px', important: true),
+        build_declaration('padding-top', '2px')
+      )
+
+      expect(set.map(&:to_s)).to eq(
+        ['display:block', 'padding-top:2px', 'color:black !important', 'margin-top:1px !important']
+      )
+    end
+
+    it 'should return an enumerator without a block' do
+      expect(build_set.each).to be_an(Enumerator)
+    end
+  end
+
   describe '#to_s' do
     it 'should join the declarations with a semicolon' do
       set = build_set(build_declaration('color', 'black'), build_declaration('display', 'block', important: true))
@@ -297,7 +328,7 @@ RSpec.describe Croissant::Style::DeclarationSet do
       set = build_set(build_declaration('color', 'black', important: true), build_declaration('display', 'block'))
       set.add(build_declaration('color', 'red'))
 
-      expect(set.map(&:to_s)).to eq(['color:black !important', 'display:block'])
+      expect(set.map(&:to_s)).to eq(['display:block', 'color:black !important'])
     end
 
     it 'should return true when the declaration was added' do

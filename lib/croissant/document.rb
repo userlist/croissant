@@ -42,7 +42,7 @@ class Croissant::Document
 
   # Compiles the style attribute of an element into an ElementStyle.
   def style_for(element)
-    declarations = Croissant::Style::Cascade.resolve(inline_rules_for(element))
+    declarations = Croissant::Style::Cascade.resolve(*inline_rules_for(element))
 
     Croissant::Style::ElementStyle.new(declarations)
   end
@@ -50,7 +50,7 @@ class Croissant::Document
   # Cascades the inlinable stylesheet rules matching an element and its style
   # attribute into an ElementStyle.
   def computed_style_for(element)
-    declarations = Croissant::Style::Cascade.resolve(rules_for(element), inline_rules_for(element))
+    declarations = Croissant::Style::Cascade.resolve(*rules_for(element), *inline_rules_for(element))
 
     Croissant::Style::ElementStyle.new(declarations)
   end

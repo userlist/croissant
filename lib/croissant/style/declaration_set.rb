@@ -53,8 +53,11 @@ class Croissant::Style::DeclarationSet
     @declarations[name]
   end
 
-  def each(&)
-    @declarations.each_value(&)
+  def each
+    return enum_for(__method__) unless block_given?
+
+    @declarations.each_value { |declaration| yield declaration unless declaration.important? }
+    @declarations.each_value { |declaration| yield declaration if declaration.important? } # rubocop:disable Style/CombinableLoops
   end
 
   def size
@@ -90,7 +93,7 @@ class Croissant::Style::DeclarationSet
   end
 
   def to_s
-    @declarations.values.join(';')
+    to_a.join(';')
   end
 
   def ==(other)

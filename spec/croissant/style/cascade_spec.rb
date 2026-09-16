@@ -19,7 +19,7 @@ RSpec.describe Croissant::Style::Cascade do
   end
 
   def resolve(*rules)
-    described_class.resolve(rules)
+    described_class.resolve(*rules)
   end
 
   def value(set, property)
@@ -155,26 +155,28 @@ RSpec.describe Croissant::Style::Cascade do
       expect(value(set, 'color')).to eq('blue')
     end
 
-    it 'should accept several collections of rules' do
-      set = described_class.resolve([build_rule('p', 'color', 'red')], [build_rule('p', 'margin-top', '1px')])
+    it 'should accept rules given as separate arguments' do
+      set = described_class.resolve(build_rule('p', 'color', 'red'), build_rule('p', 'margin-top', '1px'))
 
       expect(set.map(&:to_s)).to eq(['color:red', 'margin-top:1px'])
     end
 
-    it 'should order rules across collections by specificity' do
-      set = described_class.resolve([build_rule('#main', 'color', 'red')], [build_rule('p', 'color', 'blue')])
+    it 'should accept rules splatted from several arrays' do
+      rules = [build_rule('p', 'color', 'red')]
+      inline = [build_rule('p', 'margin-top', '1px')]
 
-      expect(value(set, 'color')).to eq('red')
+      expect(described_class.resolve(*rules, *inline).map(&:to_s)).to eq(['color:red', 'margin-top:1px'])
     end
 
-    it 'should break ties across collections by the order of the collections' do
-      set = described_class.resolve([build_rule('p', 'color', 'red')], [build_rule('p', 'color', 'blue')])
-
-      expect(value(set, 'color')).to eq('blue')
+    it 'should accept an empty splat' do
+      expect(described_class.resolve(*[], build_rule('p', 'color', 'red')).size).to eq(1)
     end
 
-    it 'should accept empty collections' do
-      expect(described_class.resolve([], [build_rule('p', 'color', 'red')]).size).to eq(1)
+    it 'should not reorder the array the rules were splatted from' do
+      rules = [build_rule('p', 'color', 'red'), build_rule('#main', 'color', 'blue')]
+      described_class.resolve(*rules)
+
+      expect(rules.map { |rule| rule.selector.to_s }).to eq(['p', '#main'])
     end
   end
 end

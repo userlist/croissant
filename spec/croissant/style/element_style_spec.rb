@@ -6,7 +6,7 @@ RSpec.describe Croissant::Style::ElementStyle do
   def build(css = nil)
     return described_class.new if css.nil?
 
-    described_class.new(Croissant::Style::Cascade.resolve([Croissant::Stylesheet::Parser.parse_attribute(css)]))
+    described_class.new(Croissant::Style::Cascade.resolve(Croissant::Stylesheet::Parser.parse_attribute(css)))
   end
 
   describe '.new' do
@@ -101,7 +101,7 @@ RSpec.describe Croissant::Style::ElementStyle do
 
     it 'should set the longhands that are not important' do
       expect(build('margin-top: 1px !important').set('margin', '2px').to_s).to eq(
-        'margin-top:1px !important;margin-right:2px;margin-bottom:2px;margin-left:2px'
+        'margin-right:2px;margin-bottom:2px;margin-left:2px;margin-top:1px !important'
       )
     end
 

@@ -6,17 +6,14 @@
 # holding the winning declaration of every property.
 module Croissant::Style::Cascade
   class << self
-    def resolve(*collections)
-      declarations = collections
-        .flatten(1)
-        .sort_by
+    def resolve(*rules)
+      declarations = rules
+        .sort_by!
         .with_index { |rule, index| [rule.specificity, index] }
         .flat_map(&:declarations)
         .map { |declaration| build_declaration(declaration) }
 
-      important, normal = declarations.partition(&:important?)
-
-      Croissant::Style::DeclarationSet.new(normal, important).expand
+      Croissant::Style::DeclarationSet.new(declarations).expand
     end
 
     private
