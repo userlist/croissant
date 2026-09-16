@@ -70,10 +70,6 @@ class Croissant::Document::Node
     self.node.add_previous_sibling(node)
   end
 
-  def key?(...)
-    node.key?(...)
-  end
-
   def matches?(...)
     node.matches?(...)
   end

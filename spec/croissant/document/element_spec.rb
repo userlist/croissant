@@ -207,7 +207,7 @@ RSpec.describe Croissant::Document::Element do
       element = element_for('<p style="color: red"></p>')
       element.style = element.style.delete('color')
 
-      expect(element.key?('style')).to be(false)
+      expect(element['style']).to be_nil
     end
 
     it 'should return the assigned style from the reader' do
@@ -239,7 +239,7 @@ RSpec.describe Croissant::Document::Element do
       element = element_for('<p></p>')
       element.style = Croissant::Style::ElementStyle.new
 
-      expect(element.key?('style')).to be(false)
+      expect(element['style']).to be_nil
     end
   end
 end
