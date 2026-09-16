@@ -11,9 +11,6 @@ class Croissant::Style::DeclarationSet
     end
   end
 
-  # Adds a declaration, replacing an existing one of the same property and
-  # moving it to the end. A normal declaration never replaces an important
-  # one. Returns whether the declaration was added.
   def add(declaration) # rubocop:disable Naming/PredicateMethod
     name = declaration.property.name
     existing = @declarations[name]
@@ -30,8 +27,6 @@ class Croissant::Style::DeclarationSet
     self
   end
 
-  # Deletes the declaration of a property. Deleting a shorthand also deletes
-  # its longhands, so it works on expanded sets as well.
   def delete(property)
     property = Croissant::Style::Property.lookup(property)
 

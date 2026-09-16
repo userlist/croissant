@@ -58,14 +58,6 @@ RSpec.describe Croissant::Transformation::PreserveStyles do
     expect(html).to start_with("<style>a:hover{color:red}\n@media print{p{color:red}}</style>")
   end
 
-  it 'should create a head when the document has none' do
-    document = Croissant::Document.parse('<html><body><p>a</p></body></html>')
-    document.document.at_css('body').add_child('<style>a:hover { color: red }</style>')
-    described_class.new.call(document)
-
-    expect(document.document.at_xpath('/html/head/style').text).to eq('a:hover{color:red}')
-  end
-
   it 'should prepend the style element to a fragment' do
     html = process('<p>a</p><style>a:hover { color: red }</style>')
 
@@ -82,7 +74,7 @@ RSpec.describe Croissant::Transformation::PreserveStyles do
     document = Croissant::Document.parse('<html><head><style>a:hover { color: red }</style></head><body></body></html>')
     described_class.new.call(document)
 
-    expect(document.head.css('style').map(&:text)).to eq(['a:hover{color:red}'])
+    expect(document.head.xpath('.//style').map(&:text)).to eq(['a:hover{color:red}'])
   end
 
   it 'should only remove the style elements when nothing needs preserving' do

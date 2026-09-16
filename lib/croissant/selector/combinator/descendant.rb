@@ -6,7 +6,6 @@ class Croissant::Selector::Combinator::Descendant < Croissant::Selector::Combina
 
     ancestor = element.parent
 
-    # The walk ends at the document or fragment holding the tree.
     while ancestor&.element?
       return true if left.matches?(ancestor)
 

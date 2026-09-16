@@ -10,6 +10,7 @@ module Croissant
       Croissant::Transformation::Elements.new([
         Croissant::Transformation::InlineStyles.new
       ]),
+      Croissant::Transformation::RemoveStyles.new,
       Croissant::Transformation::PreserveStyles.new
     ])
   end

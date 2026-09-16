@@ -11,8 +11,9 @@ RSpec.describe Croissant::Style::RuleSet do
     )
   end
 
-  def element_for(html)
-    Nokogiri::HTML.fragment(html).children.first
+  def element_for(html, xpath = nil)
+    document = Croissant::Document.parse(html)
+    xpath ? document.at_xpath(xpath) : document.children.first
   end
 
   describe '#[]' do

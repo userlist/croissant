@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-# Walks the document once and runs every matching element transformation on
-# each element, in pipeline order.
 class Croissant::Transformation::Elements < Croissant::Transformation
   attr_reader :transformations
 
@@ -20,11 +18,9 @@ class Croissant::Transformation::Elements < Croissant::Transformation
     return if @index.empty?
 
     document.each_element do |element|
-      transformations = @index[element.node]
+      transformations = @index[element]
       next if transformations.empty?
 
-      # A transformation registered under several selectors runs once, at the
-      # position of its first matching selector.
       transformations.uniq!
 
       transformations.each { |transformation| transformation.call(element) }

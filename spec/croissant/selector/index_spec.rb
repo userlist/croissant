@@ -8,8 +8,9 @@ RSpec.describe Croissant::Selector::Index do
     Croissant::Stylesheet::Parser.parse_selector(value)
   end
 
-  def element_for(html)
-    Nokogiri::HTML.fragment(html).children.first
+  def element_for(html, xpath = nil)
+    document = Croissant::Document.parse(html)
+    xpath ? document.at_xpath(xpath) : document.children.first
   end
 
   def build(entries)
@@ -79,7 +80,7 @@ RSpec.describe Croissant::Selector::Index do
 
     it 'should match descendants through a parent walk' do
       index = build([[:nested, 'div p']])
-      element = element_for('<div><section><p></p></section></div>').at_css('p')
+      element = element_for('<div><section><p></p></section></div>', './/p')
 
       expect(index[element]).to eq([:nested])
     end

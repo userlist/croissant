@@ -15,28 +15,10 @@ RSpec.describe Croissant::Document do
       expect(document).to be_a(described_class)
     end
 
-    it 'should wrap a Nokogiri document' do
-      document = described_class.parse('<html><body><p>hi</p></body></html>')
-
-      expect(document.document).to be_a(Nokogiri::HTML::Document)
-    end
-
-    it 'should wrap a Nokogiri document when the string has a doctype' do
-      document = described_class.parse("<!doctype html>\n<p>hi</p>")
-
-      expect(document.document).to be_a(Nokogiri::HTML::Document)
-    end
-
-    it 'should wrap a Nokogiri fragment when the string is partial HTML' do
-      document = described_class.parse('<p>hi</p>')
-
-      expect(document.document).to be_a(Nokogiri::HTML::DocumentFragment)
-    end
-
     it 'should not wrap partial HTML in html and body elements' do
       document = described_class.parse('<p>hi</p>')
 
-      expect(document.document.to_html).to eq('<p>hi</p>')
+      expect(document.to_html).to eq('<p>hi</p>')
     end
 
     it 'should parse style elements of partial HTML' do
@@ -112,7 +94,7 @@ RSpec.describe Croissant::Document do
     def build(html, css: 'p { color: red }')
       document = document_for("<html><head><style>#{css}</style></head><body>#{html}</body></html>")
 
-      [document, Croissant::Document::Element.new(document, document.document.at_css('body > *'))]
+      [document, Croissant::Document::Element.new(document, document.at_xpath('/html/body/*'))]
     end
 
     def computed_for(html, css: 'p { color: red }')
@@ -164,18 +146,18 @@ RSpec.describe Croissant::Document do
         </html>
       HTML
 
-      element = Croissant::Document::Element.new(document, document.document.at_css('p'))
+      element = Croissant::Document::Element.new(document, document.at_xpath('.//p'))
 
       expect(document.computed_style_for(element).to_s).to eq('color:red;margin:1px')
     end
 
-    it 'should reflect modifications to the document' do
+    it 'should keep using the stylesheets as they were on first use' do
       document, element = build('<p></p>')
       document.computed_style_for(element)
 
-      document.document.at_css('style').remove
+      document.at_xpath('.//style').remove
 
-      expect(document.computed_style_for(element)).to be_empty
+      expect(document.computed_style_for(element)['color']).to eq('red')
     end
 
     it 'should not touch the style attribute' do
@@ -183,6 +165,29 @@ RSpec.describe Croissant::Document do
       document.computed_style_for(element)
 
       expect(element['style']).to eq('color:  blue')
+    end
+  end
+
+  describe '#node_for' do
+    it 'should return an element for an element node' do
+      document = described_class.parse('<p>hi</p>')
+
+      expect(document.node_for(document.at_xpath('.//p'))).to be_a(Croissant::Document::Element)
+    end
+
+    it 'should return a plain node for a text node' do
+      document = described_class.parse('<p>hi</p>')
+      node = document.node_for(document.at_xpath('.//p').children.first)
+
+      expect(node).to be_an_instance_of(Croissant::Document::Node)
+    end
+
+    it 'should return the same view for the same node' do
+      document = described_class.parse('<p>hi</p>')
+      node = document.at_xpath('.//p')
+      view = document.node_for(node)
+
+      expect(document.node_for(node)).to be(view)
     end
   end
 
@@ -220,7 +225,7 @@ RSpec.describe Croissant::Document do
     it 'should return the existing head' do
       document = document_for('<html><head><title>t</title></head><body></body></html>')
 
-      expect(document.head.at_css('title').text).to eq('t')
+      expect(document.head.at_xpath('.//title').text).to eq('t')
     end
 
     it 'should create a head before the body when missing' do
@@ -228,7 +233,7 @@ RSpec.describe Croissant::Document do
 
       document.head
 
-      expect(document.document.root.children.map(&:name)).to eq(%w[head body])
+      expect(document.root.children.map(&:name)).to eq(%w[head body])
     end
 
     it 'should return nil for a fragment' do
@@ -240,7 +245,7 @@ RSpec.describe Croissant::Document do
     it 'should return the existing body' do
       document = document_for('<html><head></head><body><p>hi</p></body></html>')
 
-      expect(document.body.at_css('p').text).to eq('hi')
+      expect(document.body.at_xpath('.//p').text).to eq('hi')
     end
 
     it 'should create a body after the head when missing' do
@@ -248,7 +253,7 @@ RSpec.describe Croissant::Document do
 
       document.body
 
-      expect(document.document.root.children.map(&:name)).to eq(%w[head body])
+      expect(document.root.children.map(&:name)).to eq(%w[head body])
     end
 
     it 'should create html and body for an empty document' do
@@ -256,7 +261,7 @@ RSpec.describe Croissant::Document do
 
       document.body
 
-      expect(document.document.root.children.map(&:name)).to eq(%w[body])
+      expect(document.root.children.map(&:name)).to eq(%w[body])
     end
 
     it 'should return nil for a fragment' do
@@ -288,13 +293,12 @@ RSpec.describe Croissant::Document do
       expect(document.stylesheets.map(&:to_s)).to eq(['p{color:red}', 'h1{color:blue}'])
     end
 
-    it 'should reflect modifications to the document' do
+    it 'should keep the stylesheets as they were on first use' do
       document = document_for('<html><head><style>p { color: red }</style></head></html>')
-      document.stylesheets
 
-      document.document.at_css('style').content = 'h1 { color: blue }'
+      document.at_xpath('.//style').content = 'h1 { color: blue }'
 
-      expect(document.stylesheets.map(&:to_s)).to eq(['h1{color:blue}'])
+      expect(document.stylesheets.map(&:to_s)).to eq(['p{color:red}'])
     end
 
     it 'should consume style elements with a screen media attribute' do
@@ -318,9 +322,7 @@ RSpec.describe Croissant::Document do
     it 'should leave the style elements in the document' do
       document = document_for('<html><head><style>p { color: red }</style></head></html>')
 
-      document.stylesheets
-
-      expect(document.document.at_css('style').text).to eq('p { color: red }')
+      expect(document.at_xpath('.//style').text).to eq('p { color: red }')
     end
 
     it 'should return an empty list for a document without style elements' do

@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-# Base class for document transformations. Instances are built once with their
-# options, frozen, and called with a Croissant::Document per run.
 class Croissant::Transformation
   def initialize
     freeze

@@ -2,7 +2,7 @@
 
 class Croissant::Selector::Simple::Id < Croissant::Selector::Simple
   def matches?(element)
-    element['id'] == name
+    element.id == name
   end
 
   def specificity

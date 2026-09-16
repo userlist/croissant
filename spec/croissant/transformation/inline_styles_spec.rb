@@ -6,7 +6,7 @@ RSpec.describe Croissant::Transformation::InlineStyles do
   def process(html)
     document = Croissant::Document.parse(html)
     Croissant::Transformation::Elements.new([described_class.new]).call(document)
-    document.document.xpath('.//style').each(&:remove)
+    document.xpath('.//style').each(&:remove)
     document.to_html
   end
 

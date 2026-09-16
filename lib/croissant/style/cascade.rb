@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-# Resolves the CSS cascade for a single element. Rules from any number of
-# collections are ordered by specificity and then source order, and important
-# declarations win over normal ones. The result is an expanded DeclarationSet
-# holding the winning declaration of every property.
 module Croissant::Style::Cascade
   class << self
     def resolve(*rules)

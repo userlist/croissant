@@ -76,7 +76,6 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
     selector_parser.parse(content)
   end
 
-  # Parses a comma-separated selector list, e.g. "table, td".
   def parse_selector_list(content)
     split_segments(content.to_s).filter_map { |segment| parse_selector(segment) }
   end

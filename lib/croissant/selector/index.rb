@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-# Indexes payloads by the id, class, or tag of their selector's rightmost
-# compound so that looking up an element only tests the selectors it could
-# plausibly match. Payloads come back in registration order.
 class Croissant::Selector::Index
   Entry = Struct.new(:selector, :payload, :order)
   private_constant :Entry
@@ -28,10 +25,6 @@ class Croissant::Selector::Index
     self
   end
 
-  # The payloads whose selectors match the element, in registration order.
-  # Matches are collected in a single pass over the candidate buckets; every
-  # bucket is in registration order already, so a sort is only needed when
-  # more than one bucket contributed.
   def [](element)
     matches = []
     contributing = 0
@@ -42,7 +35,6 @@ class Croissant::Selector::Index
       contributing += 1 if matches.size > size
     end
 
-    # sort_by! would allocate a key pair per match.
     matches.sort! { |a, b| a.order <=> b.order } if contributing > 1 # rubocop:disable Performance/CompareWithBlock
     matches.map!(&:payload)
   end
@@ -71,8 +63,6 @@ class Croissant::Selector::Index
     end
   end
 
-  # Yields the buckets the element could match. Every attribute is read from
-  # the element once: Nokogiri allocates a new string on each read.
   def each_bucket(element, &)
     yield @universal unless @universal.empty?
 
@@ -82,13 +72,11 @@ class Croissant::Selector::Index
 
     each_class_bucket(element, &)
 
-    if (id = element['id']) && (bucket = @by_id[id])
+    if (id = element.id) && (bucket = @by_id[id])
       yield bucket
     end
   end
 
-  # Yields the bucket of every class of the element once, even when the
-  # element repeats a class.
   def each_class_bucket(element)
     return if @by_class.empty?
 

@@ -5,7 +5,7 @@ require 'spec_helper'
 RSpec.describe Croissant::Document::Element do
   def build(html, css: 'p { color: red }')
     document = Croissant::Document.parse("<style>#{css}</style>#{html}")
-    node = document.document.css('body *, style ~ *').first || document.document.children.last
+    node = document.at_xpath('.//body//* | .//style/following-sibling::*') || document.children.last
 
     [document, described_class.new(document, node)]
   end
@@ -30,12 +30,56 @@ RSpec.describe Croissant::Document::Element do
     end
   end
 
+  describe '#id' do
+    it 'should return the id' do
+      expect(element_for('<p id="a"></p>').id).to eq('a')
+    end
+
+    it 'should be nil without an id' do
+      expect(element_for('<p></p>').id).to be_nil
+    end
+  end
+
+  describe '#classes' do
+    it 'should return the classes' do
+      expect(element_for('<p class="a b"></p>').classes).to eq(%w[a b])
+    end
+
+    it 'should be empty without a class attribute' do
+      expect(element_for('<p></p>').classes).to eq([])
+    end
+
+    it 'should split classes on any whitespace' do
+      expect(element_for("<p class=\" a\tb\nc \"></p>").classes).to eq(%w[a b c])
+    end
+
+    it 'should keep repeated classes' do
+      expect(element_for('<p class="a a"></p>').classes).to eq(%w[a a])
+    end
+  end
+
   describe '#[]=' do
     it 'should write an attribute to the node' do
       element = element_for('<p></p>')
       element['width'] = '100'
 
-      expect(element.node['width']).to eq('100')
+      expect(element.to_html).to eq('<p width="100"></p>')
+    end
+
+    it 'should reflect a written class attribute in the classes' do
+      element = element_for('<p class="a"></p>')
+      element.classes
+      element['class'] = 'b'
+
+      expect(element.classes).to eq(%w[b])
+    end
+
+    it 'should reflect a written id attribute in the id' do
+      element = element_for('<p></p>')
+      element.id
+      element['id'] = 'a'
+
+      expect(element.id).to eq('a')
     end
   end
 
@@ -44,7 +88,15 @@ RSpec.describe Croissant::Document::Element do
       element = element_for('<p class="a"></p>')
       element.remove_attribute('class')
 
-      expect(element.node['class']).to be_nil
+      expect(element['class']).to be_nil
+    end
+
+    it 'should reflect a removed class attribute in the classes' do
+      element = element_for('<p class="a"></p>')
+      element.classes
+      element.remove_attribute('class')
+
+      expect(element.classes).to eq([])
     end
   end
 
@@ -84,7 +136,7 @@ RSpec.describe Croissant::Document::Element do
       element = element_for('<p style="color:  red"></p>')
       element.style['color']
 
-      expect(element.node['style']).to eq('color:  red')
+      expect(element['style']).to eq('color:  red')
     end
   end
 
@@ -128,7 +180,7 @@ RSpec.describe Croissant::Document::Element do
       element = element_for('<p style="color:  blue"></p>')
       element.computed_style
 
-      expect(element.node['style']).to eq('color:  blue')
+      expect(element['style']).to eq('color:  blue')
     end
 
     it 'should be frozen' do
@@ -141,21 +193,21 @@ RSpec.describe Croissant::Document::Element do
       element = element_for('<p></p>')
       element.style = element.style.set('color', 'red')
 
-      expect(element.node['style']).to eq('color:red')
+      expect(element['style']).to eq('color:red')
     end
 
     it 'should merge with the existing style attribute' do
       element = element_for('<p style="margin: 1px"></p>')
       element.style = element.style.set('color', 'red')
 
-      expect(element.node['style']).to eq('margin:1px;color:red')
+      expect(element['style']).to eq('margin:1px;color:red')
     end
 
     it 'should remove the attribute when the style is empty' do
       element = element_for('<p style="color: red"></p>')
       element.style = element.style.delete('color')
 
-      expect(element.node.key?('style')).to be(false)
+      expect(element.key?('style')).to be(false)
     end
 
     it 'should return the assigned style from the reader' do
@@ -171,23 +223,23 @@ RSpec.describe Croissant::Document::Element do
       style = element.style
       element.style = style
 
-      expect(element.node['style']).to eq('color:red')
+      expect(element['style']).to eq('color:red')
     end
 
     it 'should not touch an attribute that is already normalized' do
       element = element_for('<p style="color:red"></p>')
-      attribute = element.node.attribute('style')
+      attribute = element['style']
       style = element.style
       element.style = style
 
-      expect(element.node.attribute('style')).to be(attribute)
+      expect(element['style']).to eq(attribute)
     end
 
     it 'should leave a missing attribute alone when assigned an empty style' do
       element = element_for('<p></p>')
       element.style = Croissant::Style::ElementStyle.new
 
-      expect(element.node.key?('style')).to be(false)
+      expect(element.key?('style')).to be(false)
     end
   end
 end

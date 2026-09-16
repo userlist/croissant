@@ -22,4 +22,19 @@ RSpec.describe Croissant::Transformation::RemoveStyles do
   it 'should leave documents without style elements alone' do
     expect(process('<p>a</p>')).to eq('<p>a</p>')
   end
+
+  it 'should keep the parsed stylesheets available to later transformations' do
+    document = Croissant::Document.parse('<style>p { color: red }</style><p>a</p>')
+    described_class.new.call(document)
+
+    expect(document.stylesheets.map(&:to_s)).to eq(['p{color:red}'])
+  end
+
+  it 'should keep the computed styles available to later transformations' do
+    document = Croissant::Document.parse('<style>p { color: red }</style><p>a</p>')
+    described_class.new.call(document)
+    element = document.each_element.first
+
+    expect(document.computed_style_for(element)['color']).to eq('red')
+  end
 end
