@@ -179,6 +179,38 @@ RSpec.describe Croissant::Style::Value do
     end
   end
 
+  describe '.split' do
+    def split(input)
+      described_class::List.split(input)
+    end
+
+    it 'should split on top-level whitespace' do
+      expect(split('1px solid red')).to eq(%w[1px solid red])
+    end
+
+    it 'should return a single token unsplit' do
+      expect(split('1px')).to eq(['1px'])
+    end
+
+    it 'should keep a bracketed group together' do
+      expect(split('calc(1px + 2px) 3px')).to eq(['calc(1px + 2px)', '3px'])
+    end
+
+    it 'should keep a quoted string together' do
+      expect(split('"Helvetica Neue" 2px')).to eq(['"Helvetica Neue"', '2px'])
+    end
+
+    it 'should split on commas when given the segment pattern' do
+      segments = described_class::List::SEGMENTS
+
+      expect(described_class::List.split('Arial, sans-serif', segments)).to eq(%w[Arial sans-serif])
+    end
+
+    it 'should accept something that is not a string' do
+      expect(split(nil)).to eq([])
+    end
+  end
+
   describe '#absolutize' do
     it 'should convert an absolute unit to pixels' do
       expect(parse('1in').absolutize.to_s).to eq('96px')

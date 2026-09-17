@@ -18,12 +18,10 @@ class Croissant::Style::Property
 
   def initialize(name, initial: nil, inherited: false, shorthand: nil, type: nil)
     @name = name
-    @initial = initial
     @inherited = inherited
     @shorthand = shorthand
-    # Not frozen: a type can be a bare class, and freezing that would freeze
-    # the class itself. A Union already freezes on construction.
     @type = type || Croissant::Style::Value.default_type
+    @initial = parse_value(initial)
 
     freeze
   end

@@ -18,18 +18,18 @@ class Croissant::Style::Value::List < Croissant::Style::Value
       segments = split(input, SEGMENTS)
       return build(segments, :comma, type) if segments.length > 1
 
-      tokens = split(input, TOKENS)
+      tokens = split(input)
       build(tokens, :space, type) if tokens.length > 1
+    end
+
+    def split(input, pattern = TOKENS)
+      input.to_s.scan(pattern).map(&:strip).reject(&:empty?)
     end
 
     private
 
     def build(parts, separator, type)
       new(parts.map { |part| Croissant::Style::Value.parse(part, type) }, separator)
-    end
-
-    def split(input, pattern)
-      input.scan(pattern).map(&:strip).reject(&:empty?)
     end
   end
 

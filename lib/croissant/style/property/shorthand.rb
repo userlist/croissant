@@ -10,7 +10,7 @@ class Croissant::Style::Property::Shorthand < Croissant::Style::Property
   end
 
   def expand(declaration)
-    sides = expand_sides(split_values(declaration.value))
+    sides = expand_sides(Croissant::Style::Value::List.split(declaration.value))
     return [] unless sides
 
     longhands.zip(sides).map do |longhand, value|
@@ -56,33 +56,5 @@ class Croissant::Style::Property::Shorthand < Croissant::Style::Property
     sides = sides[0..1] if sides.length == 3 && sides[2] == sides[0]
     sides = sides[0..0] if sides.length == 2 && sides[1] == sides[0]
     sides
-  end
-
-  def split_values(value)
-    values = [+'']
-    depth = 0
-
-    value.to_s.each_char do |char|
-      depth += paren_depth(char)
-      append_char(values, char, depth)
-    end
-
-    values.reject(&:empty?)
-  end
-
-  def append_char(values, char, depth)
-    if depth.zero? && char.match?(/\s/)
-      values << +'' unless values.last.empty?
-    else
-      values.last << char
-    end
-  end
-
-  def paren_depth(char)
-    case char
-    when '(' then 1
-    when ')' then -1
-    else 0
-    end
   end
 end

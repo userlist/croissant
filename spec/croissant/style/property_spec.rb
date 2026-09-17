@@ -5,7 +5,7 @@ require 'spec_helper'
 RSpec.describe Croissant::Style::Property do
   describe '.lookup' do
     it 'should return the definition of a registered property' do
-      expect(described_class.lookup('margin-top').initial).to eq('0')
+      expect(described_class.lookup('margin-top').initial).to eq(Croissant::Style::Value::Length['0'])
     end
 
     it 'should return an inherited definition for an inherited property' do
@@ -94,6 +94,26 @@ RSpec.describe Croissant::Style::Property do
 
     it 'should default to nil' do
       expect(described_class.new('font-family').initial).to be_nil
+    end
+
+    it 'should read the initial value through the type of the property' do
+      expect(described_class.lookup('margin-top').initial).to be_a(Croissant::Style::Value::Length)
+    end
+
+    it 'should read a unitless zero initial as a zero length' do
+      expect(described_class.lookup('margin-top').initial).to eq(Croissant::Style::Value::Length['0'])
+    end
+
+    it 'should read a keyword initial as a keyword' do
+      expect(described_class.lookup('width').initial).to be_a(Croissant::Style::Value::Keyword)
+    end
+
+    it 'should read a colour initial as a colour' do
+      expect(described_class.lookup('background-color').initial).to be_a(Croissant::Style::Value::Color)
+    end
+
+    it 'should read a multi-token initial as a list' do
+      expect(described_class.lookup('background-position').initial).to be_a(Croissant::Style::Value::List)
     end
   end
 

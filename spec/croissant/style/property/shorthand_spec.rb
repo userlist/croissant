@@ -39,6 +39,24 @@ RSpec.describe Croissant::Style::Property::Shorthand do
       )
     end
 
+    it 'should keep a bracketed group together rather than splitting inside it' do
+      expect(expand('calc(1px + 2px) 3px')).to eq(
+        'margin-top' => 'calc(1px + 2px)',
+        'margin-right' => '3px',
+        'margin-bottom' => 'calc(1px + 2px)',
+        'margin-left' => '3px'
+      )
+    end
+
+    it 'should keep a quoted string together rather than splitting inside it' do
+      expect(expand('"Helvetica Neue"')).to eq(
+        'margin-top' => '"Helvetica Neue"',
+        'margin-right' => '"Helvetica Neue"',
+        'margin-bottom' => '"Helvetica Neue"',
+        'margin-left' => '"Helvetica Neue"'
+      )
+    end
+
     it 'should apply two values vertically and horizontally' do
       expect(expand('10px 20px')).to eq(
         'margin-top' => '10px',
