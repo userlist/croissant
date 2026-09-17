@@ -22,6 +22,10 @@ class Croissant::Style::Value
     @default_type ||= Numeric | Keyword | Color
   end
 
+  def self.global_type
+    @global_type ||= Union.new(:inherit, :initial, :unset, :revert, :'revert-layer')
+  end
+
   def initialize(value)
     @value = value
 
@@ -77,6 +81,7 @@ end
 
 require_relative 'value/numeric'
 require_relative 'value/number'
+require_relative 'value/integer'
 require_relative 'value/percentage'
 require_relative 'value/length'
 require_relative 'value/keyword'

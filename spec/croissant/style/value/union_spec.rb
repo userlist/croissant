@@ -26,6 +26,36 @@ RSpec.describe Croissant::Style::Value::Union do
     end
   end
 
+  describe 'symbols as keyword literals' do
+    it 'should read a symbol as the keyword it names' do
+      expect(described_class.new(length, :auto).types.last).to eq(:auto)
+    end
+
+    it 'should build a keyword, not keep the symbol' do
+      expect(described_class.new(length, :auto).types.last).to be_a(keyword)
+    end
+
+    it 'should let a grammar be written the way CSS writes it' do
+      expect((length | :auto).parse('auto')).to eq(:auto)
+    end
+
+    it 'should still refuse a keyword it does not name' do
+      expect((length | :auto).parse('none')).to be_nil
+    end
+
+    it 'should build a whole set from symbols alone' do
+      expect(described_class.new(:solid, :dotted).parse('dotted')).to eq(:dotted)
+    end
+
+    it 'should leave classes alone' do
+      expect(described_class.new(length, :auto).types.first).to be(length)
+    end
+
+    it 'should chain through | as well as the initializer' do
+      expect((length | :auto | :none).types.length).to eq(3)
+    end
+  end
+
   describe '#|' do
     it 'should build a union from two types' do
       expect(length | keyword).to be_a(described_class)

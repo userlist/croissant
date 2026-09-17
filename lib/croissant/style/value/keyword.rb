@@ -3,6 +3,12 @@
 class Croissant::Style::Value::Keyword < Croissant::Style::Value
   PATTERN = /\A-{0,2}[a-z_\u{80}-\u{10FFFF}][a-z0-9_\-\u{80}-\u{10FFFF}]*\z/i
 
+  def self.[](input)
+    return new(input) if input.is_a?(Symbol)
+
+    super
+  end
+
   def self.parse(input)
     new(input) if PATTERN.match?(input)
   end

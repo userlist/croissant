@@ -10,8 +10,12 @@ class Croissant::Style::Value::Union
   # Unions among the arguments are absorbed rather than nested, so `a | (b | c)`
   # and `(a | b) | c` are the same union. Alternation is associative; the
   # bracketing is an artefact of how it was written.
+  #
+  # A Symbol is read as the keyword literal it names, so a grammar can be
+  # written the way CSS writes it: `length | :auto` rather than
+  # `length | Keyword[:auto]`.
   def initialize(*types)
-    @types = types.flat_map { |type| type.is_a?(self.class) ? type.types : type }.freeze
+    @types = types.flat_map { |type| expand(type) }.freeze
 
     freeze
   end
@@ -40,5 +44,14 @@ class Croissant::Style::Value::Union
 
   def inspect
     "#<#{self.class} #{types.inspect}>"
+  end
+
+  private
+
+  def expand(type)
+    return type.types if type.is_a?(self.class)
+    return Croissant::Style::Value::Keyword[type] if type.is_a?(Symbol) || type.is_a?(String)
+
+    type
   end
 end

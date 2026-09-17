@@ -20,7 +20,7 @@ class Croissant::Style::Property
     @name = name
     @inherited = inherited
     @shorthand = shorthand
-    @type = type || Croissant::Style::Value.default_type
+    @type = (type || Croissant::Style::Value.default_type) | Croissant::Style::Value.global_type
     @initial = parse_value(initial)
 
     freeze

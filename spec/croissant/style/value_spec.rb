@@ -211,6 +211,64 @@ RSpec.describe Croissant::Style::Value do
     end
   end
 
+  describe '.global_type' do
+    it 'should parse a CSS-wide keyword' do
+      expect(described_class.global_type.parse('inherit')).to eq(:inherit)
+    end
+
+    it 'should cover every CSS-wide keyword' do
+      names = %w[inherit initial unset revert revert-layer]
+      parsed = names.map { |name| described_class.global_type.parse(name) }
+
+      expect(parsed).to all(be_a(described_class::Keyword))
+    end
+
+    it 'should not parse anything else' do
+      expect(described_class.global_type.parse('auto')).to be_nil
+    end
+
+    it 'should be the same union on every call' do
+      first = described_class.global_type
+      second = described_class.global_type
+
+      expect(first).to be(second)
+    end
+  end
+
+  describe 'an integer' do
+    it 'should parse integral notation' do
+      expect(described_class::Integer['2']).to be_a(described_class::Integer)
+    end
+
+    it 'should parse a signed integer' do
+      expect(described_class::Integer['-2'].to_i).to eq(-2)
+    end
+
+    it 'should not parse a fractional number' do
+      expect(described_class::Integer['2.5']).to be_nil
+    end
+
+    it 'should not parse a length' do
+      expect(described_class::Integer['2px']).to be_nil
+    end
+
+    it 'should be a number, since CSS makes integers a subset of them' do
+      expect(described_class::Integer['2']).to be_a(described_class::Number)
+    end
+
+    it 'should serialize without a decimal point' do
+      expect(described_class::Integer['2'].to_s).to eq('2')
+    end
+
+    it 'should stay out of the generic chain, which has no property to ask' do
+      expect(described_class.parse('2')).to be_an_instance_of(described_class::Number)
+    end
+
+    it 'should stay out of the numeric chain too' do
+      expect(described_class::Numeric.parse('2')).to be_an_instance_of(described_class::Number)
+    end
+  end
+
   describe '#absolutize' do
     it 'should convert an absolute unit to pixels' do
       expect(parse('1in').absolutize.to_s).to eq('96px')

@@ -217,18 +217,37 @@ RSpec.describe Croissant::Style::Property do
 
   describe '#type' do
     it 'should default to the generic chain' do
-      expect(described_class.new('color').type).to eq(Croissant::Style::Value.default_type)
+      expect(described_class.new('color').type).to eq(Croissant::Style::Value.default_type | Croissant::Style::Value.global_type)
     end
 
     it 'should keep the types it is given' do
       type = Croissant::Style::Value::Color | Croissant::Style::Value::Keyword
 
-      expect(described_class.new('color', type:).type).to eq(type)
+      expect(described_class.new('color', type:).type).to eq(type | Croissant::Style::Value.global_type)
     end
 
-    it 'should keep a bare class as a type of its own' do
-      expect(described_class.new('color', type: Croissant::Style::Value::Color).type)
-        .to be(Croissant::Style::Value::Color)
+    it 'should accept a bare class as a type' do
+      property = described_class.new('color', type: Croissant::Style::Value::Color)
+
+      expect(property.parse_value('#fff')).to be_a(Croissant::Style::Value::Color)
+    end
+
+    it 'should append the CSS-wide keywords to whatever type it is given' do
+      property = described_class.new('color', type: Croissant::Style::Value::Color)
+
+      expect(property.parse_value('inherit')).to eq(:inherit)
+    end
+
+    it 'should let a narrowed keyword type still take the CSS-wide keywords' do
+      property = described_class.new('width', type: Croissant::Style::Value::Keyword[:auto])
+
+      expect(property.parse_value('initial')).to eq(:initial)
+    end
+
+    it 'should still refuse a keyword a narrowed type does not name' do
+      property = described_class.new('width', type: Croissant::Style::Value::Keyword[:auto])
+
+      expect(property.parse_value('block')).to be_a(Croissant::Style::Value::Unparsed)
     end
 
     it 'should not freeze a bare class, which would freeze the class itself' do
@@ -300,6 +319,60 @@ RSpec.describe Croissant::Style::Property do
     end
   end
 
+  describe 'the built-in types' do
+    def parse(name, input)
+      described_class.lookup(name).parse_value(input)
+    end
+
+    it 'should read z-index as an integer' do
+      expect(parse('z-index', '2')).to be_a(Croissant::Style::Value::Integer)
+    end
+
+    it 'should refuse a fractional z-index rather than claim to understand it' do
+      expect(parse('z-index', '2.5')).to be_a(Croissant::Style::Value::Unparsed)
+    end
+
+    it 'should accept auto on width' do
+      expect(parse('width', 'auto')).to eq(:auto)
+    end
+
+    it 'should refuse auto on max-width, where CSS does not allow it' do
+      expect(parse('max-width', 'auto')).to be_a(Croissant::Style::Value::Unparsed)
+    end
+
+    it 'should accept none on max-width' do
+      expect(parse('max-width', 'none')).to eq(:none)
+    end
+
+    it 'should refuse none on width, where CSS does not allow it' do
+      expect(parse('width', 'none')).to be_a(Croissant::Style::Value::Unparsed)
+    end
+
+    it 'should refuse a keyword the property does not take' do
+      expect(parse('width', 'block')).to be_a(Croissant::Style::Value::Unparsed)
+    end
+
+    it 'should refuse auto on padding, which takes no keywords of its own' do
+      expect(parse('padding-top', 'auto')).to be_a(Croissant::Style::Value::Unparsed)
+    end
+
+    it 'should still take the CSS-wide keywords on a narrowed property' do
+      expect(parse('padding-top', 'inherit')).to eq(:inherit)
+    end
+
+    it 'should read a border style keyword' do
+      expect(parse('border-top-style', 'dotted')).to eq(:dotted)
+    end
+
+    it 'should refuse a border style that does not exist' do
+      expect(parse('border-top-style', 'wiggly')).to be_a(Croissant::Style::Value::Unparsed)
+    end
+
+    it 'should keep an open keyword on colour properties, for the system colours' do
+      expect(parse('color', 'canvastext')).to be_a(Croissant::Style::Value::Keyword)
+    end
+  end
+
   describe 'BUILT_IN' do
     it 'should be frozen' do
       expect(described_class::BUILT_IN).to be_frozen
@@ -311,6 +384,12 @@ RSpec.describe Croissant::Style::Property do
 
     it 'should hold frozen definitions' do
       expect(described_class::BUILT_IN).to all(be_frozen)
+    end
+
+    it 'should give every property an initial value its own type can read' do
+      unreadable = described_class::BUILT_IN.select { |property| property.initial.is_a?(Croissant::Style::Value::Unparsed) }
+
+      expect(unreadable.map(&:name)).to be_empty
     end
 
     it 'should name each property only once, so nothing silently shadows anything' do
