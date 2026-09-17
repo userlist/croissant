@@ -3,6 +3,88 @@
 require 'spec_helper'
 
 RSpec.describe Croissant::Style::Property do
+  describe '.lookup' do
+    it 'should return the definition of a registered property' do
+      expect(described_class.lookup('margin-top').initial).to eq('0')
+    end
+
+    it 'should return an inherited definition for an inherited property' do
+      expect(described_class.lookup('color')).to be_inherited
+    end
+
+    it 'should return a non-inherited definition for a reset property' do
+      expect(described_class.lookup('margin-top')).not_to be_inherited
+    end
+
+    it 'should return the same definition instance on every lookup' do
+      first = described_class.lookup('color')
+      second = described_class.lookup('color')
+
+      expect(first).to be(second)
+    end
+
+    it 'should keep a definition it is handed rather than looking it up' do
+      property = described_class.new('color')
+
+      expect(described_class.lookup(property)).to be(property)
+    end
+
+    it 'should return a fallback definition named after an unknown property' do
+      expect(described_class.lookup('-webkit-text-size-adjust').name).to eq('-webkit-text-size-adjust')
+    end
+
+    it 'should return a fallback definition without an initial value' do
+      expect(described_class.lookup('unknown').initial).to be_nil
+    end
+
+    it 'should return a fallback definition that does not inherit' do
+      expect(described_class.lookup('unknown')).not_to be_inherited
+    end
+
+    it 'should not memoize a fallback, which would cache on untrusted names' do
+      first = described_class.lookup('unknown')
+      second = described_class.lookup('unknown')
+
+      expect(first).not_to be(second)
+    end
+
+    it 'should return a shorthand definition for a four-side shorthand' do
+      expect(described_class.lookup('margin')).to be_a(described_class::Shorthand)
+    end
+
+    it 'should map a four-side shorthand onto its longhands' do
+      expect(described_class.lookup('margin').longhands).to eq(
+        %w[margin-top margin-right margin-bottom margin-left]
+      )
+    end
+
+    it 'should not set a shorthand on a standalone property' do
+      expect(described_class.lookup('color').shorthand).to be_nil
+    end
+
+    it 'should link every longhand of every shorthand back to it' do
+      %w[margin padding inset border-color border-style border-width].each do |name|
+        shorthand = described_class.lookup(name)
+        longhands = shorthand.longhands.map { |longhand| described_class.lookup(longhand).shorthand }
+
+        expect(longhands).to all(be(shorthand))
+      end
+    end
+  end
+
+  describe '.registry' do
+    it 'should hold every built-in property' do
+      expect(described_class.registry.count).to eq(described_class::BUILT_IN.size)
+    end
+
+    it 'should be the same registry on every call' do
+      first = described_class.registry
+      second = described_class.registry
+
+      expect(first).to be(second)
+    end
+  end
+
   describe '#initial' do
     it 'should return the initial value' do
       property = described_class.new('color', initial: 'canvastext')
@@ -195,6 +277,38 @@ RSpec.describe Croissant::Style::Property do
       value = Croissant::Style::Value::Keyword.new('auto')
 
       expect(build.parse_value(value)).to be(value)
+    end
+  end
+
+  describe 'BUILT_IN' do
+    it 'should be frozen' do
+      expect(described_class::BUILT_IN).to be_frozen
+    end
+
+    it 'should hold property definitions' do
+      expect(described_class::BUILT_IN).to all(be_a(described_class))
+    end
+
+    it 'should hold frozen definitions' do
+      expect(described_class::BUILT_IN).to all(be_frozen)
+    end
+
+    it 'should name each property only once, so nothing silently shadows anything' do
+      names = described_class::BUILT_IN.map(&:name)
+
+      expect(names.uniq.size).to eq(names.size)
+    end
+
+    it 'should include the four-side shorthands' do
+      expected = %w[inset margin padding border-color border-style border-width]
+
+      expect(described_class::BUILT_IN.grep(described_class::Shorthand).map(&:name)).to match_array(expected)
+    end
+
+    it 'should include the longhands of every shorthand' do
+      longhands = described_class::BUILT_IN.grep(described_class::Shorthand).flat_map(&:longhands)
+
+      expect(described_class::BUILT_IN.map(&:name)).to include(*longhands)
     end
   end
 end

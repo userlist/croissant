@@ -6,7 +6,14 @@ class Croissant::Style::Property
   def self.lookup(property)
     return property if property.is_a?(self)
 
-    Croissant::Style::Properties[property]
+    registry.lookup(property)
+  end
+
+  def self.registry
+    @registry ||= Croissant::Registry.new(
+      BUILT_IN,
+      fallback: ->(name) { Croissant::Style::Property.new(name) }
+    )
   end
 
   def initialize(name, initial: nil, inherited: false, shorthand: nil, type: nil)
@@ -55,3 +62,6 @@ class Croissant::Style::Property
     [self.class, name, initial, inherited?, shorthand, type].hash
   end
 end
+
+require_relative 'property/shorthand'
+require_relative 'property/built_in'
