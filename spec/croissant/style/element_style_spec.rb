@@ -23,7 +23,7 @@ RSpec.describe Croissant::Style::ElementStyle do
 
   describe '#[]' do
     it 'should return the value of a property' do
-      expect(build('color: red')['color']).to eq('red')
+      expect(build('color: red')['color']).to eq('#ff0000')
     end
 
     it 'should return nil for an undeclared property' do
@@ -38,8 +38,36 @@ RSpec.describe Croissant::Style::ElementStyle do
       expect(build('margin: 1px')['margin']).to be_nil
     end
 
+    it 'should return a parsed value' do
+      expect(build('color: red')['color']).to be_a(Croissant::Style::Value::Color)
+    end
+
+    it 'should read a property that wants a length as a length' do
+      expect(build('width: 10px')['width']).to be_a(Croissant::Style::Value::Length)
+    end
+
+    it 'should read a unitless zero as a length' do
+      expect(build('margin-top: 0')['margin-top']).to be_a(Croissant::Style::Value::Length)
+    end
+
+    it 'should read line-height as a number rather than a length' do
+      expect(build('line-height: 1.5')['line-height']).to be_a(Croissant::Style::Value::Number)
+    end
+
+    it 'should read an identifier as a keyword for a property that wants no colour' do
+      expect(build('display: block')['display']).to be_a(Croissant::Style::Value::Keyword)
+    end
+
+    it 'should keep a value none of the types of the property recognize' do
+      expect(build('width: calc(1px + 2px)')['width']).to be_a(Croissant::Style::Value::Unparsed)
+    end
+
+    it 'should serialize from the raw value rather than the parsed one' do
+      expect(build('color: red').to_s).to eq('color:red')
+    end
+
     it 'should look up a property given as a Property instance' do
-      expect(build('color: red')[Croissant::Style::Property.lookup('color')]).to eq('red')
+      expect(build('color: red')[Croissant::Style::Property.lookup('color')]).to eq('#ff0000')
     end
   end
 
@@ -70,7 +98,7 @@ RSpec.describe Croissant::Style::ElementStyle do
     end
 
     it 'should override an existing property' do
-      expect(build('color: red').set('color', 'blue')['color']).to eq('blue')
+      expect(build('color: red').set('color', 'blue')['color']).to eq('#0000ff')
     end
 
     it 'should move an overridden property to the end' do
@@ -125,7 +153,7 @@ RSpec.describe Croissant::Style::ElementStyle do
       style = build('color: red')
       style.delete('color')
 
-      expect(style['color']).to eq('red')
+      expect(style['color']).to eq('#ff0000')
     end
 
     it 'should delete the longhands of a shorthand' do

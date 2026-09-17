@@ -110,7 +110,7 @@ RSpec.describe Croissant::Document::Element do
 
   describe '#style' do
     it 'should parse the style attribute' do
-      expect(element_for('<p style="color: blue"></p>').style['color']).to eq('blue')
+      expect(element_for('<p style="color: blue"></p>').style['color']).to eq('#0000ff')
     end
 
     it 'should not include stylesheet rules' do
@@ -142,7 +142,7 @@ RSpec.describe Croissant::Document::Element do
 
   describe '#computed_style' do
     it 'should include matching stylesheet rules' do
-      expect(element_for('<p></p>').computed_style['color']).to eq('red')
+      expect(element_for('<p></p>').computed_style['color']).to eq('#ff0000')
     end
 
     it 'should include the style attribute' do
@@ -152,14 +152,14 @@ RSpec.describe Croissant::Document::Element do
     it 'should let the style attribute win over stylesheet rules' do
       element = element_for('<p style="color: blue"></p>', css: '#a { color: red }')
 
-      expect(element.computed_style['color']).to eq('blue')
+      expect(element.computed_style['color']).to eq('#0000ff')
     end
 
     it 'should reflect an assigned style' do
       element = element_for('<p></p>')
       element.style = element.style.set('color', 'blue')
 
-      expect(element.computed_style['color']).to eq('blue')
+      expect(element.computed_style['color']).to eq('#0000ff')
     end
 
     it 'should reflect a deleted property' do

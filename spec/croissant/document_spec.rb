@@ -64,7 +64,7 @@ RSpec.describe Croissant::Document do
     end
 
     it 'should compile the style attribute' do
-      expect(document_for('').style_for(element_for('<p style="color: red"></p>'))['color']).to eq('red')
+      expect(document_for('').style_for(element_for('<p style="color: red"></p>'))['color']).to eq('#ff0000')
     end
 
     it 'should expand shorthands' do
@@ -107,7 +107,7 @@ RSpec.describe Croissant::Document do
     end
 
     it 'should include matching stylesheet rules' do
-      expect(computed_for('<p></p>')['color']).to eq('red')
+      expect(computed_for('<p></p>')['color']).to eq('#ff0000')
     end
 
     it 'should not include rules that do not match' do
@@ -123,19 +123,19 @@ RSpec.describe Croissant::Document do
     end
 
     it 'should let the style attribute win over stylesheet rules' do
-      expect(computed_for('<p id="a" style="color: blue"></p>', css: '#a { color: red }')['color']).to eq('blue')
+      expect(computed_for('<p id="a" style="color: blue"></p>', css: '#a { color: red }')['color']).to eq('#0000ff')
     end
 
     it 'should let an important stylesheet rule win over the style attribute' do
-      expect(computed_for('<p style="color: blue"></p>', css: 'p { color: red !important }')['color']).to eq('red')
+      expect(computed_for('<p style="color: blue"></p>', css: 'p { color: red !important }')['color']).to eq('#ff0000')
     end
 
     it 'should resolve stylesheet rules by specificity' do
-      expect(computed_for('<p class="a"></p>', css: 'p { color: red } .a { color: blue }')['color']).to eq('blue')
+      expect(computed_for('<p class="a"></p>', css: 'p { color: red } .a { color: blue }')['color']).to eq('#0000ff')
     end
 
     it 'should let a later rule win over an earlier equally specific one' do
-      expect(computed_for('<p></p>', css: 'p { color: red } p { color: blue }')['color']).to eq('blue')
+      expect(computed_for('<p></p>', css: 'p { color: red } p { color: blue }')['color']).to eq('#0000ff')
     end
 
     it 'should include rules from all stylesheets' do
@@ -157,7 +157,7 @@ RSpec.describe Croissant::Document do
 
       document.at_xpath('.//style').remove
 
-      expect(document.computed_style_for(element)['color']).to eq('red')
+      expect(document.computed_style_for(element)['color']).to eq('#ff0000')
     end
 
     it 'should not touch the style attribute' do
@@ -355,7 +355,7 @@ RSpec.describe Croissant::Document do
       document.head.add_child(style)
       document.reload
 
-      expect(document.computed_style_for(element)['color']).to eq('red')
+      expect(document.computed_style_for(element)['color']).to eq('#ff0000')
     end
   end
 end

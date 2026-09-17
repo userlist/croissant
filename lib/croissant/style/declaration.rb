@@ -15,6 +15,10 @@ class Croissant::Style::Declaration
     @important
   end
 
+  def parsed_value
+    property.parse_value(value)
+  end
+
   def to_s
     important? ? "#{property}:#{value} !important" : "#{property}:#{value}"
   end

@@ -25,6 +25,31 @@ RSpec.describe Croissant::Style::Declaration do
     end
   end
 
+  describe '#parsed_value' do
+    it 'should read the value through the type of the property' do
+      expect(described_class.new('color', 'red').parsed_value).to be_a(Croissant::Style::Value::Color)
+    end
+
+    it 'should read the same value differently for a property that wants no colour' do
+      expect(described_class.new('animation-name', 'red').parsed_value).to be_a(Croissant::Style::Value::Keyword)
+    end
+
+    it 'should keep a value the property cannot recognize' do
+      expect(described_class.new('color', 'calc(1px + 2px)').parsed_value.to_s).to eq('calc(1px + 2px)')
+    end
+
+    it 'should leave the raw value alone' do
+      expect(described_class.new('color', 'red').value).to eq('red')
+    end
+
+    it 'should not memoize, so a frozen declaration stays frozen' do
+      declaration = described_class.new('color', 'red')
+      declaration.parsed_value
+
+      expect(declaration).to be_frozen
+    end
+  end
+
   describe '#important?' do
     it 'should be true when the declaration is important' do
       expect(described_class.new('color', 'black', important: true)).to be_important

@@ -35,6 +35,6 @@ RSpec.describe Croissant::Transformation::RemoveStyles do
     described_class.new.call(document)
     element = document.each_element.first
 
-    expect(document.computed_style_for(element)['color']).to eq('red')
+    expect(document.computed_style_for(element)['color']).to eq('#ff0000')
   end
 end

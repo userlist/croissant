@@ -136,7 +136,7 @@ RSpec.describe Croissant::Transformation::Elements do
 
       html = process('<p class="red">a</p>', [colorer.new, reader.new])
 
-      expect(html).to eq('<p class="red" style="color:red" data-color="red">a</p>')
+      expect(html).to eq('<p class="red" style="color:red" data-color="#ff0000">a</p>')
     end
 
     it 'should do nothing without transformations' do

@@ -12,7 +12,7 @@ class Croissant::Style::ElementStyle
   end
 
   def [](property)
-    declaration_for(property)&.value
+    declaration_for(property)&.parsed_value
   end
 
   def important?(property)
