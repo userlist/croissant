@@ -10,3 +10,4 @@ gem 'rspec', '~> 3.0'
 gem 'rubocop', '~> 1.89'
 gem 'rubocop-performance', '~> 1.26'
 gem 'rubocop-rspec', '~> 3.10'
+gem 'rubydex', '~> 0.4', require: false

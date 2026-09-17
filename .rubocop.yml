@@ -6,6 +6,8 @@ AllCops:
   TargetRubyVersion: 3.2
   NewCops: enable
   SuggestExtensions: false
+  UseProjectIndex: true
+
 
 Layout/ArgumentAlignment:
   EnforcedStyle: with_fixed_indentation
@@ -24,6 +26,10 @@ Layout/MultilineMethodCallIndentation:
 
 Lint/AssignmentInCondition:
   Enabled: false
+
+Lint/DuplicateMethods:
+  Exclude:
+    - 'benchmark/**/*'
 
 Metrics/BlockLength:
   Exclude:
