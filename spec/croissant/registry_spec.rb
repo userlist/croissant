@@ -82,12 +82,6 @@ RSpec.describe Croissant::Registry do
       expect(registry.lookup('px')).to be(pixel)
     end
 
-    it 'should return the registered value' do
-      pixel = entry('px')
-
-      expect(described_class.new.register(pixel)).to be(pixel)
-    end
-
     it 'should replace a value already registered under the same name' do
       registry = described_class.new
       replacement = entry('px')
@@ -96,6 +90,19 @@ RSpec.describe Croissant::Registry do
       registry.register(replacement)
 
       expect(registry.lookup('px')).to be(replacement)
+    end
+
+    it 'should allow adding multiple values at once' do
+      registry = described_class.new
+      pixel = entry('px')
+      em = entry('em')
+
+      registry.register(pixel, em)
+
+      aggregate_failures do
+        expect(registry.lookup('px')).to be(pixel)
+        expect(registry.lookup('em')).to be(em)
+      end
     end
   end
 

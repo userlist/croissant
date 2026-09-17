@@ -8,7 +8,7 @@ class Croissant::Registry
     @fallback = fallback
     @normalize = normalize
 
-    values.each { |value| register(value) }
+    register(*values)
 
     yield(self) if block_given?
   end
@@ -21,10 +21,14 @@ class Croissant::Registry
     @normalize = block
   end
 
-  def register(value)
-    name = normalize_name(value.name)
+  def register(*values)
+    values.each do |value|
+      next unless name = normalize_name(value.name)
 
-    @registry[name] = value
+      @registry[name] = value
+    end
+
+    self
   end
 
   def lookup(name)
