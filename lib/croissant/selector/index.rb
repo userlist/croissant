@@ -35,7 +35,7 @@ class Croissant::Selector::Index
       contributing += 1 if matches.size > size
     end
 
-    matches.sort! { |a, b| a.order <=> b.order } if contributing > 1 # rubocop:disable Performance/CompareWithBlock
+    sort_by_order!(matches) if contributing > 1
     matches.map!(&:payload)
   end
 
@@ -53,6 +53,20 @@ class Croissant::Selector::Index
   end
 
   private
+
+  # A handful of already ordered runs, where Array#sort! allocates a scratch array.
+  def sort_by_order!(matches)
+    1.upto(matches.size - 1) do |index|
+      entry = matches[index]
+
+      while index.positive? && matches[index - 1].order > entry.order
+        matches[index] = matches[index - 1]
+        index -= 1
+      end
+
+      matches[index] = entry
+    end
+  end
 
   def bucket_for(key)
     case key
