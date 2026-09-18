@@ -11,7 +11,7 @@ class Croissant::Document::Node
   end
 
   def element?
-    node.element?
+    false
   end
 
   def text?

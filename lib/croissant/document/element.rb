@@ -4,6 +4,10 @@ class Croissant::Document::Element < Croissant::Document::Node
   NO_CLASSES = [].freeze
   private_constant :NO_CLASSES
 
+  def element?
+    true
+  end
+
   def id
     return @id if defined?(@id)
 
