@@ -19,9 +19,9 @@ class Croissant::Style::Property::Shorthand < Croissant::Style::Property
   end
 
   def collapse(declarations)
-    parts = longhands.map { |longhand| declarations[longhand] }
-    return declarations unless collapsible?(parts)
+    return declarations unless collapsible?(declarations)
 
+    parts = longhands.map { |longhand| declarations[longhand] }
     value = collapse_sides(parts.map { |part| part.value.to_s }).join(' ')
 
     declarations.replace(longhands, Croissant::Style::Declaration.new(self, value, important: parts.first.important?))
@@ -47,8 +47,14 @@ class Croissant::Style::Property::Shorthand < Croissant::Style::Property
     end
   end
 
-  def collapsible?(parts)
-    parts.none?(&:nil?) && parts.map(&:important?).uniq.size == 1
+  def collapsible?(declarations)
+    first = declarations[longhands.first]
+
+    first && longhands.all? do |longhand|
+      part = declarations[longhand]
+
+      part && part.important? == first.important?
+    end
   end
 
   def collapse_sides(sides)

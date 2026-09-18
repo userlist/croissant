@@ -41,7 +41,7 @@ class Croissant::Style::Cascade
   end
 
   def sort(rules)
-    (1...rules.size).each do |index|
+    1.upto(rules.size - 1) do |index|
       rule = rules[index]
 
       while index.positive? && (rules[index - 1].specificity <=> rule.specificity).positive?

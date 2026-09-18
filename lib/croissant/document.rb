@@ -4,6 +4,9 @@ require 'nokogiri'
 
 class Croissant::Document
   DOCUMENT_PATTERN = /<!doctype\s|<html[\s>]/i
+  NO_RULES = [].freeze
+
+  private_constant :NO_RULES
 
   def self.parse(html)
     if html.match?(DOCUMENT_PATTERN)
@@ -116,7 +119,7 @@ class Croissant::Document
 
   def inline_rules_for(element)
     value = element['style']
-    return [] if value.nil? || value.strip.empty?
+    return NO_RULES if value.nil? || value.strip.empty?
 
     [parser.parse_attribute(value)]
   end
