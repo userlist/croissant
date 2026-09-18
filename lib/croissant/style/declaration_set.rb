@@ -6,10 +6,9 @@ class Croissant::Style::DeclarationSet
 
   def initialize(*collections)
     @declarations = {}
+    @important = false
 
-    collections.each do |declarations|
-      declarations.each { |declaration| add(declaration) }
-    end
+    collections.each { |declarations| declarations.each { |declaration| add(declaration) } }
   end
 
   def add(declaration) # rubocop:disable Naming/PredicateMethod
@@ -20,6 +19,7 @@ class Croissant::Style::DeclarationSet
 
     @declarations.delete(name) if existing
     @declarations[name] = declaration
+    @important ||= declaration.important?
     true
   end
 
@@ -49,11 +49,14 @@ class Croissant::Style::DeclarationSet
     @declarations[name]
   end
 
-  def each
-    return enum_for(__method__) unless block_given?
+  # Important declarations sort last, which only needs a second pass when the set holds any.
+  def each(&block)
+    return enum_for(__method__) unless block
+    return @declarations.each_value(&block) unless @important
 
     @declarations.each_value { |declaration| yield declaration unless declaration.important? }
-    @declarations.each_value { |declaration| yield declaration if declaration.important? } # rubocop:disable Style/CombinableLoops
+    # rubocop:disable-next Style/CombinableLoops
+    @declarations.each_value { |declaration| yield declaration if declaration.important? }
   end
 
   def size
@@ -65,11 +68,27 @@ class Croissant::Style::DeclarationSet
   end
 
   def merge(declarations)
-    spawn(self, declarations)
+    spawn { |copy| copy.merge!(declarations) }
+  end
+
+  def merge!(declarations)
+    declarations.each { |declaration| add(declaration) }
+
+    self
   end
 
   def expand
-    spawn(flat_map { |declaration| declaration.property.expand(declaration) })
+    spawn(&:expand!)
+  end
+
+  def expand!
+    expanded = flat_map { |declaration| declaration.property.expand(declaration) }
+
+    @declarations = {}
+    @important = false
+    expanded.each { |declaration| add(declaration) }
+
+    self
   end
 
   def collapse
@@ -77,15 +96,14 @@ class Croissant::Style::DeclarationSet
   end
 
   def replace(names, declaration)
-    replaced = @declarations.each_with_object({}) do |(name, existing), result|
-      if names.include?(name)
-        result[declaration.property.name] ||= declaration
-      else
-        result[name] = existing
-      end
-    end
+    spawn { |copy| copy.replace!(names, declaration) }
+  end
 
-    spawn(replaced.values)
+  def replace!(names, declaration)
+    @declarations = replaced_declarations(names, declaration)
+    @important ||= declaration.important?
+
+    self
   end
 
   def append_to(buffer)
@@ -103,9 +121,33 @@ class Croissant::Style::DeclarationSet
 
   private
 
-  def spawn(*collections)
-    set = self.class.new(*collections)
-    set.freeze if frozen?
-    set
+  # A copy owns its declarations, so the block can mutate it without touching this set.
+  def initialize_copy(other)
+    super
+
+    @declarations = @declarations.dup
+  end
+
+  def spawn
+    copy = dup
+    yield copy
+    copy.freeze if frozen?
+    copy
+  end
+
+  # Rebuilt rather than mutated so the replacement keeps the slot of the first name it replaces.
+  def replaced_declarations(names, declaration)
+    target = declaration.property.name
+    replaced = {}
+
+    @declarations.each_key do |name|
+      if names.include?(name)
+        replaced[target] ||= declaration
+      else
+        replaced[name] = @declarations[name]
+      end
+    end
+
+    replaced
   end
 end
