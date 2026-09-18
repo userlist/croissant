@@ -5,7 +5,8 @@ class Croissant::Style::Type::Color < Croissant::Style::Type
     Croissant::Style::Value::Color
   end
 
-  HEX = /\A#(\h+)\z/
+  HEX = /\A#(\h{3,8})\z/
+  HEX_SIZES = [3, 4, 6, 8].freeze
   FUNCTIONAL = /\Argba?\(([^()]*)\)\z/i
   SEPARATOR = %r{[,/\s]+}
   CHANNEL = /\A#{Numeric::NUMBER}%?\z/
@@ -56,17 +57,23 @@ class Croissant::Style::Type::Color < Croissant::Style::Type
 
   def hex(input)
     match = HEX.match(input)
-    return unless match && [3, 4, 6, 8].include?(match[1].length)
+    return unless match && HEX_SIZES.include?(match[1].length)
 
     red, green, blue, alpha = hex_channels(match[1])
 
     value_class.build(red, green, blue, alpha ? alpha / 255.0 : OPAQUE)
   end
 
+  # The three and four digit forms repeat every digit (#abc is #aabbcc), which is a scale by 17.
   def hex_channels(digits)
-    digits = digits.gsub(/\h/) { |digit| digit * 2 } if digits.length < 6
+    short = digits.length < 6
+    bits = short ? 4 : 8
+    mask = short ? 0x0f : 0xff
+    scale = short ? 17 : 1
+    packed = digits.to_i(16)
+    count = short ? digits.length : digits.length / 2
 
-    digits.scan(/\h{2}/).map { |pair| pair.to_i(16) }
+    Array.new(count) { |index| ((packed >> ((count - index - 1) * bits)) & mask) * scale }
   end
 
   def named(input)

@@ -40,7 +40,7 @@ class Croissant::Style::Value::Color < Croissant::Style::Value
   end
 
   def to_s
-    return format('#%<red>02x%<green>02x%<blue>02x', red:, green:, blue:) if opaque?
+    return format('#%06x', value) if opaque?
 
     "rgba(#{red}, #{green}, #{blue}, #{alpha_text})"
   end
