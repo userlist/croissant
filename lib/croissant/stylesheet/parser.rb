@@ -355,7 +355,7 @@ class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def advance_balanced(scanner, open, close, specials) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
+  def advance_balanced(scanner, open, close, specials) # rubocop:disable Metrics/MethodLength
     string = scanner.string
     depth = 1
 

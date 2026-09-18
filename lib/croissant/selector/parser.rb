@@ -276,7 +276,7 @@ class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
     root
   end
 
-  def parse_pseudo(text, stop) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+  def parse_pseudo(text, stop) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/PerceivedComplexity
     return parse_pseudo_element(text, stop) if text.getbyte(@position + 1) == COLON
 
     length = word_length(text, @position + 1, stop)

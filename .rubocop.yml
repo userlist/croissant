@@ -35,6 +35,9 @@ Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
 
+Metrics/CyclomaticComplexity:
+  Max: 10
+
 RSpec/ExampleWording:
   Enabled: false
 

@@ -48,7 +48,7 @@ class Croissant::Selector::Simple::Attribute < Croissant::Selector::Simple
 
   private
 
-  def compare(actual, expected) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
+  def compare(actual, expected) # rubocop:disable Metrics/MethodLength
     if case_insensitive?
       actual = actual.downcase
       expected = expected.downcase
