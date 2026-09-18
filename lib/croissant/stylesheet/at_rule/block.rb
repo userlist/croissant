@@ -9,10 +9,8 @@ class Croissant::Stylesheet::AtRule::Block < Croissant::Stylesheet::AtRule
     super(name:, prelude:)
   end
 
-  def to_s
-    prefix = prelude.empty? ? "@#{name}" : "@#{name} #{prelude}"
-
-    "#{prefix}{#{body}}"
+  def append_to(buffer)
+    append_prelude(buffer) << '{' << body.to_s << '}'
   end
 
   def ==(other)

@@ -9,10 +9,11 @@ class Croissant::Stylesheet::AtRule::ConditionalGroup < Croissant::Stylesheet::A
     super(name:, prelude:)
   end
 
-  def to_s
-    prefix = prelude.empty? ? "@#{name}" : "@#{name} #{prelude}"
+  def append_to(buffer)
+    append_prelude(buffer) << '{'
+    append_each(buffer, rules, "\n")
 
-    "#{prefix}{#{rules.join("\n")}}"
+    buffer << '}'
   end
 
   def ==(other)

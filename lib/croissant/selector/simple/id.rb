@@ -9,7 +9,7 @@ class Croissant::Selector::Simple::Id < Croissant::Selector::Simple
     Croissant::Selector::Specificity.id
   end
 
-  def to_s
-    "##{name}"
+  def append_to(buffer)
+    buffer << '#' << name
   end
 end

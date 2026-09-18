@@ -13,7 +13,12 @@ class Croissant::Selector::Simple::Type < Croissant::Selector::Simple
     Croissant::Selector::Specificity.element
   end
 
+  # Overrides Serializable#to_s: the name is already the whole serialisation.
   def to_s
     name
+  end
+
+  def append_to(buffer)
+    buffer << name
   end
 end

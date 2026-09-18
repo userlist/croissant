@@ -26,8 +26,10 @@ class Croissant::Selector::Combinator < Croissant::Selector
     right.index_key
   end
 
-  def to_s
-    "#{left} #{combinator} #{right}"
+  def append_to(buffer)
+    left.append_to(buffer) << ' ' << combinator << ' '
+
+    right.append_to(buffer)
   end
 end
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class Croissant::Style::Value::List < Croissant::Style::Value
+  include Croissant::Serializable
   include Enumerable
 
   SEPARATORS = { comma: ', ', space: ' ' }.freeze
@@ -25,8 +26,8 @@ class Croissant::Style::Value::List < Croissant::Style::Value
     self.class.new(map { |item| item.absolutize(**context) }, separator)
   end
 
-  def to_s
-    to_a.join(SEPARATORS.fetch(separator))
+  def append_to(buffer)
+    append_each(buffer, value, SEPARATORS.fetch(separator))
   end
 
   def ==(other)

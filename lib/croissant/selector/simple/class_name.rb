@@ -9,7 +9,7 @@ class Croissant::Selector::Simple::ClassName < Croissant::Selector::Simple
     Croissant::Selector::Specificity.class_name
   end
 
-  def to_s
-    ".#{name}"
+  def append_to(buffer)
+    buffer << '.' << name
   end
 end

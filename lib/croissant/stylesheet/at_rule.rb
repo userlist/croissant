@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Croissant::Stylesheet::AtRule
+  include Croissant::Serializable
+
   attr_reader :name, :prelude
 
   def initialize(name:, prelude:)
@@ -21,6 +23,15 @@ class Croissant::Stylesheet::AtRule
 
   def hash
     [self.class, name, prelude].hash
+  end
+
+  private
+
+  def append_prelude(buffer)
+    buffer << '@' << name.to_s
+    buffer << ' ' << prelude.to_s unless prelude.empty?
+
+    buffer
   end
 end
 

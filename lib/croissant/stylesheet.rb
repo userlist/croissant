@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Croissant::Stylesheet
+  include Croissant::Serializable
+
   attr_reader :rules
 
   def initialize(rules)
@@ -9,8 +11,8 @@ class Croissant::Stylesheet
     freeze
   end
 
-  def to_s
-    rules.join("\n")
+  def append_to(buffer)
+    append_each(buffer, rules, "\n")
   end
 
   def ==(other)

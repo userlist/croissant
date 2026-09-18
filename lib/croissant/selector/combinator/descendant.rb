@@ -15,7 +15,9 @@ class Croissant::Selector::Combinator::Descendant < Croissant::Selector::Combina
     false
   end
 
-  def to_s
-    "#{left} #{right}"
+  def append_to(buffer)
+    left.append_to(buffer) << ' '
+
+    right.append_to(buffer)
   end
 end

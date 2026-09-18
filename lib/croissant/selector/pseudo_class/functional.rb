@@ -17,8 +17,11 @@ class Croissant::Selector::PseudoClass::Functional < Croissant::Selector::Pseudo
     selectors.all?(&:inlinable?)
   end
 
-  def to_s
-    ":#{keyword}(#{selectors.join(', ')})"
+  def append_to(buffer)
+    buffer << ':' << keyword << '('
+    append_each(buffer, selectors, ', ')
+
+    buffer << ')'
   end
 
   private

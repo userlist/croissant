@@ -1,8 +1,14 @@
 # frozen_string_literal: true
 
 class Croissant::Selector
+  include Croissant::Serializable
+
   def initialize
     freeze
+  end
+
+  def append_to(_buffer)
+    raise NotImplementedError, "subclass must implement #{self.class}##{__method__}"
   end
 
   def matches?(_)

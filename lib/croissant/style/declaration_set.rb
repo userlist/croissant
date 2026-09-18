@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class Croissant::Style::DeclarationSet
+  include Croissant::Serializable
   include Enumerable
 
   def initialize(*collections)
@@ -87,8 +88,8 @@ class Croissant::Style::DeclarationSet
     spawn(replaced.values)
   end
 
-  def to_s
-    to_a.join(';')
+  def append_to(buffer)
+    append_each(buffer, self, ';')
   end
 
   def ==(other)

@@ -18,6 +18,7 @@ module Croissant
 end
 
 require_relative 'croissant/version'
+require_relative 'croissant/serializable'
 require_relative 'croissant/registry'
 require_relative 'croissant/stylesheet'
 require_relative 'croissant/selector'

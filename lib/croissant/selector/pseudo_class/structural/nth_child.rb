@@ -22,8 +22,8 @@ class Croissant::Selector::PseudoClass::Structural::NthChild < Croissant::Select
     matches_formula?(index)
   end
 
-  def to_s
-    super + "(#{formula})"
+  def append_to(buffer)
+    super << '(' << formula << ')'
   end
 
   private

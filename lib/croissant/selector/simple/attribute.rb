@@ -36,13 +36,14 @@ class Croissant::Selector::Simple::Attribute < Croissant::Selector::Simple
     Croissant::Selector::Specificity.class_name
   end
 
-  def to_s
-    return "[#{name}]" if operator == :exists
+  def append_to(buffer)
+    buffer << '[' << name
+    return buffer << ']' if operator == :exists
 
-    flag = case_insensitive? ? ' i' : ''
-    operator = OPERATOR_TOKENS.fetch(self.operator)
+    buffer << OPERATOR_TOKENS.fetch(operator) << '"' << value.to_s << '"'
+    buffer << ' i' if case_insensitive?
 
-    "[#{name}#{operator}\"#{value}\"#{flag}]"
+    buffer << ']'
   end
 
   private

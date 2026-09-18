@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Croissant::Stylesheet::Rule
+  include Croissant::Serializable
+
   attr_reader :selector, :declarations, :specificity
 
   def initialize(declarations:, selector: nil, specificity: nil)
@@ -13,8 +15,11 @@ class Croissant::Stylesheet::Rule
     freeze
   end
 
-  def to_s
-    "#{selector}{#{declarations.join(';')}}"
+  def append_to(buffer)
+    buffer << selector.to_s << '{'
+    append_each(buffer, declarations, ';')
+
+    buffer << '}'
   end
 
   def inlinable?

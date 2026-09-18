@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class Croissant::Style::ElementStyle
+  include Croissant::Serializable
   include Enumerable
 
   attr_reader :declarations
@@ -41,8 +42,8 @@ class Croissant::Style::ElementStyle
     declarations.empty?
   end
 
-  def to_s
-    declarations.collapse.to_s
+  def append_to(buffer)
+    declarations.collapse.append_to(buffer)
   end
 
   def ==(other)

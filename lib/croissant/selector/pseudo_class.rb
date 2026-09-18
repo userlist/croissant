@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 class Croissant::Selector::PseudoClass < Croissant::Selector
-  def to_s
-    ":#{keyword}"
+  def append_to(buffer)
+    buffer << ':' << keyword
   end
 
   private

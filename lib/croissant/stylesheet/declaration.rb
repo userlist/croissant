@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Croissant::Stylesheet::Declaration
+  include Croissant::Serializable
+
   attr_reader :property, :value, :important
 
   def initialize(property:, value:, important: false)
@@ -15,8 +17,11 @@ class Croissant::Stylesheet::Declaration
     important
   end
 
-  def to_s
-    important? ? "#{property}:#{value} !important" : "#{property}:#{value}"
+  def append_to(buffer)
+    buffer << property << ':' << value.to_s
+    buffer << ' !important' if important?
+
+    buffer
   end
 
   def ==(other)

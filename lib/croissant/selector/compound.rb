@@ -27,8 +27,12 @@ class Croissant::Selector::Compound < Croissant::Selector
     Croissant::Selector::Specificity.new(value)
   end
 
-  def to_s
-    selectors.empty? ? '*' : selectors.join
+  def append_to(buffer)
+    return buffer << '*' if selectors.empty?
+
+    selectors.each { |selector| selector.append_to(buffer) }
+
+    buffer
   end
 
   def index_key

@@ -10,8 +10,11 @@ class Croissant::Selector::PseudoClass::Unknown < Croissant::Selector::PseudoCla
     super()
   end
 
-  def to_s
-    argument ? ":#{name}(#{argument})" : ":#{name}"
+  def append_to(buffer)
+    buffer << ':' << name
+    buffer << '(' << argument.to_s << ')' if argument
+
+    buffer
   end
 
   def matches?(_)

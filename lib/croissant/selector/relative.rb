@@ -17,8 +17,10 @@ class Croissant::Selector::Relative < Croissant::Selector
     selector.specificity
   end
 
-  def to_s
-    prefix ? "#{prefix} #{selector}" : selector.to_s
+  def append_to(buffer)
+    buffer << prefix << ' ' if prefix
+
+    selector.append_to(buffer)
   end
 
   private
