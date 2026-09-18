@@ -13,5 +13,6 @@ end
 require_relative 'transformation/element'
 require_relative 'transformation/elements'
 require_relative 'transformation/inline_styles'
+require_relative 'transformation/presentational_attributes'
 require_relative 'transformation/remove_styles'
 require_relative 'transformation/preserve_styles'

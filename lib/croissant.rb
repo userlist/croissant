@@ -8,7 +8,8 @@ module Croissant
   def self.default_pipeline
     @default_pipeline ||= Croissant::Pipeline.new([
       Croissant::Transformation::Elements.new([
-        Croissant::Transformation::InlineStyles.new
+        Croissant::Transformation::InlineStyles.new,
+        Croissant::Transformation::PresentationalAttributes.new
       ]),
       Croissant::Transformation::RemoveStyles.new,
       Croissant::Transformation::PreserveStyles.new
