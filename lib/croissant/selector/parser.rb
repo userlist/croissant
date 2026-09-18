@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Croissant::Selector::Parser # rubocop:disable Metrics/ClassLength
+class Croissant::Selector::Parser
   LEGACY_PSEUDO_ELEMENTS = %w[
     before
     after

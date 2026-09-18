@@ -2,7 +2,7 @@
 
 require 'strscan'
 
-class Croissant::Stylesheet::Parser # rubocop:disable Metrics/ClassLength
+class Croissant::Stylesheet::Parser
   HTML_COMMENT = /<!--|-->/
   IMPORTANT = /!\s*important\s*\z/i
 

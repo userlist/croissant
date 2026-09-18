@@ -2,7 +2,7 @@
 
 require_relative '../../refinements/symbol'
 
-class << Class.new # rubocop:disable Metrics/ClassLength
+class << Class.new
   using Croissant::Refinements::Symbol
   include Croissant::Style::Type.helper_methods
 
