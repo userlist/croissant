@@ -72,6 +72,7 @@ class Croissant::Style::DeclarationSet
   end
 
   def merge!(declarations)
+    @declarations = @declarations.dup
     declarations.each { |declaration| add(declaration) }
 
     self
@@ -121,13 +122,8 @@ class Croissant::Style::DeclarationSet
 
   private
 
-  # A copy owns its declarations, so the block can mutate it without touching this set.
-  def initialize_copy(other)
-    super
-
-    @declarations = @declarations.dup
-  end
-
+  # The copy starts out sharing these declarations, so the block owes it its own: either a
+  # fresh hash, the way #expand! and #replace! build one, or a copy, the way #merge! takes one.
   def spawn
     copy = dup
     yield copy
