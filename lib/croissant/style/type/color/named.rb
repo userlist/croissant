@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-Croissant::Style::Value::Color::NAMED = {
+Croissant::Style::Type::Color::NAMED = {
   'aliceblue' => 0xf0f8ff,
   'antiquewhite' => 0xfaebd7,
   'aqua' => 0x00ffff,

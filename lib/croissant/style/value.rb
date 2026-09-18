@@ -1,31 +1,6 @@
 # frozen_string_literal: true
 
 class Croissant::Style::Value
-  def self.parse(input, type = default_type)
-    return input if input.is_a?(Croissant::Style::Value)
-
-    input = input.to_s.strip
-    return if input.empty?
-
-    type.parse(input) || List.parse(input, type) || Unparsed.parse(input)
-  end
-
-  def self.[](...)
-    parse(...)
-  end
-
-  def self.|(other)
-    Union.new(self, other)
-  end
-
-  def self.default_type
-    @default_type ||= Numeric | Keyword | Color
-  end
-
-  def self.global_type
-    @global_type ||= Union.new(:inherit, :initial, :unset, :revert, :'revert-layer')
-  end
-
   def initialize(value)
     @value = value
 
@@ -41,6 +16,10 @@ class Croissant::Style::Value
   end
 
   def to_str
+    to_s
+  end
+
+  def to_html
     to_s
   end
 
@@ -81,11 +60,10 @@ end
 
 require_relative 'value/numeric'
 require_relative 'value/number'
-require_relative 'value/integer'
 require_relative 'value/percentage'
 require_relative 'value/length'
 require_relative 'value/keyword'
 require_relative 'value/unparsed'
+require_relative 'value/url'
 require_relative 'value/color'
 require_relative 'value/list'
-require_relative 'value/union'

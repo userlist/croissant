@@ -15,8 +15,8 @@ RSpec.describe Croissant do
       expect(leaked).to be_empty
     end
 
-    it 'should keep ::Integer, which Value::Integer shadows inside the library' do
-      expect(Integer).not_to be(Croissant::Style::Value::Integer)
+    it 'should keep ::Integer, which Type::Integer shadows inside the library' do
+      expect(Integer).not_to be(Croissant::Style::Type::Integer)
     end
 
     it 'should keep ::Numeric, which Value::Numeric shadows inside the library' do

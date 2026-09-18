@@ -5,7 +5,7 @@ require 'spec_helper'
 RSpec.describe Croissant::Style::Property do
   describe '.lookup' do
     it 'should return the definition of a registered property' do
-      expect(described_class.lookup('margin-top').initial).to eq(Croissant::Style::Value::Length['0'])
+      expect(described_class.lookup('margin-top').initial).to eq(Croissant::Style::Type::Length.new.parse('0'))
     end
 
     it 'should return an inherited definition for an inherited property' do
@@ -101,7 +101,7 @@ RSpec.describe Croissant::Style::Property do
     end
 
     it 'should read a unitless zero initial as a zero length' do
-      expect(described_class.lookup('margin-top').initial).to eq(Croissant::Style::Value::Length['0'])
+      expect(described_class.lookup('margin-top').initial).to eq(Croissant::Style::Type::Length.new.parse('0'))
     end
 
     it 'should read a keyword initial as a keyword' do
@@ -217,55 +217,53 @@ RSpec.describe Croissant::Style::Property do
 
   describe '#type' do
     it 'should default to the generic chain' do
-      expect(described_class.new('color').type).to eq(Croissant::Style::Value.default_type | Croissant::Style::Value.global_type)
+      expect(described_class.new('color').type).to eq(Croissant::Style::Type.complete)
     end
 
-    it 'should keep the types it is given' do
-      type = Croissant::Style::Value::Color | Croissant::Style::Value::Keyword
+    it 'should complete the type it is given' do
+      type = Croissant::Style::Type::Color.new | Croissant::Style::Type::Keyword.new
 
-      expect(described_class.new('color', type:).type).to eq(type | Croissant::Style::Value.global_type)
+      expect(described_class.new('color', type:).type).to eq(Croissant::Style::Type.complete(type))
     end
 
-    it 'should accept a bare class as a type' do
-      property = described_class.new('color', type: Croissant::Style::Value::Color)
+    it 'should accept a single type' do
+      property = described_class.new('color', type: Croissant::Style::Type::Color.new)
 
       expect(property.parse_value('#fff')).to be_a(Croissant::Style::Value::Color)
     end
 
     it 'should append the CSS-wide keywords to whatever type it is given' do
-      property = described_class.new('color', type: Croissant::Style::Value::Color)
+      property = described_class.new('color', type: Croissant::Style::Type::Color.new)
 
       expect(property.parse_value('inherit')).to eq(:inherit)
     end
 
     it 'should let a narrowed keyword type still take the CSS-wide keywords' do
-      property = described_class.new('width', type: Croissant::Style::Value::Keyword[:auto])
+      property = described_class.new('width', type: Croissant::Style::Type::Keyword.new(:auto))
 
       expect(property.parse_value('initial')).to eq(:initial)
     end
 
     it 'should still refuse a keyword a narrowed type does not name' do
-      property = described_class.new('width', type: Croissant::Style::Value::Keyword[:auto])
+      property = described_class.new('width', type: Croissant::Style::Type::Keyword.new(:auto))
 
       expect(property.parse_value('block')).to be_a(Croissant::Style::Value::Unparsed)
     end
 
-    it 'should not freeze a bare class, which would freeze the class itself' do
-      described_class.new('color', type: Croissant::Style::Value::Color)
-
-      expect(Croissant::Style::Value::Color).not_to be_frozen
+    it 'should be frozen, like the property it belongs to' do
+      expect(described_class.new('color', type: Croissant::Style::Type::Color.new).type).to be_frozen
     end
 
     it 'should take part in equality' do
-      first = described_class.new('color', type: Croissant::Style::Value::Color)
-      second = described_class.new('color', type: Croissant::Style::Value::Keyword)
+      first = described_class.new('color', type: Croissant::Style::Type::Color.new)
+      second = described_class.new('color', type: Croissant::Style::Type::Keyword.new)
 
       expect(first).not_to eq(second)
     end
 
     it 'should take part in the hash' do
-      first = described_class.new('color', type: Croissant::Style::Value::Color)
-      second = described_class.new('color', type: Croissant::Style::Value::Keyword)
+      first = described_class.new('color', type: Croissant::Style::Type::Color.new)
+      second = described_class.new('color', type: Croissant::Style::Type::Keyword.new)
 
       expect(first.hash).not_to eq(second.hash)
     end
@@ -277,39 +275,47 @@ RSpec.describe Croissant::Style::Property do
     end
 
     it 'should parse with the types of the property' do
-      property = build(Croissant::Style::Value::Color, Croissant::Style::Value::Keyword)
+      property = build(Croissant::Style::Type::Color.new, Croissant::Style::Type::Keyword.new)
 
       expect(property.parse_value('red')).to be_a(Croissant::Style::Value::Color)
     end
 
-    it 'should read the same value as a keyword for a property that wants no colour' do
-      expect(build.parse_value('red')).to be_a(Croissant::Style::Value::Keyword)
+    it 'should keep the same value as written for a property with no grammar of its own' do
+      expect(build.parse_value('red')).to be_a(Croissant::Style::Value::Unparsed)
     end
 
     it 'should keep a value none of its types recognize' do
-      expect(build(Croissant::Style::Value::Color).parse_value('auto')).to be_a(Croissant::Style::Value::Unparsed)
+      expect(build(Croissant::Style::Type::Color.new).parse_value('auto')).to be_a(Croissant::Style::Value::Unparsed)
     end
 
     it 'should keep the text of a value it does not recognize' do
-      property = build(Croissant::Style::Value::Color)
+      property = build(Croissant::Style::Type::Color.new)
 
       expect(property.parse_value('calc(1px + 2px)').to_s).to eq('calc(1px + 2px)')
     end
 
     it 'should accept only the keywords a narrowed type names' do
-      allowed = Croissant::Style::Value::Keyword[:auto] | Croissant::Style::Value::Keyword[:none]
+      allowed = Croissant::Style::Type::Keyword.new(:auto) | Croissant::Style::Type::Keyword.new(:none)
 
       expect(build(allowed).parse_value('auto')).to eq(:auto)
     end
 
     it 'should keep a keyword a narrowed type does not name' do
-      allowed = Croissant::Style::Value::Keyword[:auto] | Croissant::Style::Value::Keyword[:none]
+      allowed = Croissant::Style::Type::Keyword.new(:auto) | Croissant::Style::Type::Keyword.new(:none)
 
       expect(build(allowed).parse_value('block')).to be_a(Croissant::Style::Value::Unparsed)
     end
 
     it 'should return nil for a blank value' do
       expect(build.parse_value('')).to be_nil
+    end
+
+    it 'should return nil for no value at all' do
+      expect(build.parse_value(nil)).to be_nil
+    end
+
+    it 'should ignore the space around a value' do
+      expect(build.parse_value('  10px  ')).to eq(build.parse_value('10px'))
     end
 
     it 'should return a value it is given unchanged' do
@@ -325,7 +331,7 @@ RSpec.describe Croissant::Style::Property do
     end
 
     it 'should read z-index as an integer' do
-      expect(parse('z-index', '2')).to be_a(Croissant::Style::Value::Integer)
+      expect(parse('z-index', '2')).to be_a(Croissant::Style::Value::Number)
     end
 
     it 'should refuse a fractional z-index rather than claim to understand it' do

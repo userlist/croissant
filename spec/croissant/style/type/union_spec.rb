@@ -2,10 +2,10 @@
 
 require 'spec_helper'
 
-RSpec.describe Croissant::Style::Value::Union do
-  let(:colour) { Croissant::Style::Value::Color }
-  let(:keyword) { Croissant::Style::Value::Keyword }
-  let(:length) { Croissant::Style::Value::Length }
+RSpec.describe Croissant::Style::Type::Union do
+  let(:colour) { Croissant::Style::Type::Color.new }
+  let(:keyword) { Croissant::Style::Type::Keyword.new }
+  let(:length) { Croissant::Style::Type::Length.new }
 
   describe '.new' do
     it 'should keep the types it is given' do
@@ -28,11 +28,11 @@ RSpec.describe Croissant::Style::Value::Union do
 
   describe 'symbols as keyword literals' do
     it 'should read a symbol as the keyword it names' do
-      expect(described_class.new(length, :auto).types.last).to eq(:auto)
+      expect(described_class.new(length, :auto).types.last.matcher).to eq(:auto)
     end
 
-    it 'should build a keyword, not keep the symbol' do
-      expect(described_class.new(length, :auto).types.last).to be_a(keyword)
+    it 'should build a keyword type narrowed to it, not keep the symbol' do
+      expect(described_class.new(length, :auto).types.last).to be_a(Croissant::Style::Type::Keyword)
     end
 
     it 'should let a grammar be written the way CSS writes it' do
@@ -47,7 +47,7 @@ RSpec.describe Croissant::Style::Value::Union do
       expect(described_class.new(:solid, :dotted).parse('dotted')).to eq(:dotted)
     end
 
-    it 'should leave classes alone' do
+    it 'should leave types alone' do
       expect(described_class.new(length, :auto).types.first).to be(length)
     end
 
@@ -76,11 +76,11 @@ RSpec.describe Croissant::Style::Value::Union do
 
   describe '#parse' do
     it 'should return the value of the first type that recognizes the input' do
-      expect((length | keyword).parse('10px')).to be_a(length)
+      expect((length | keyword).parse('10px')).to be_a(Croissant::Style::Value::Length)
     end
 
     it 'should fall through to a later type' do
-      expect((length | keyword).parse('auto')).to be_a(keyword)
+      expect((length | keyword).parse('auto')).to be_a(Croissant::Style::Value::Keyword)
     end
 
     it 'should return nil when no type recognizes the input' do
@@ -88,11 +88,43 @@ RSpec.describe Croissant::Style::Value::Union do
     end
 
     it 'should ask the types in the order they were combined' do
-      expect((colour | keyword).parse('red')).to be_a(colour)
+      expect((colour | keyword).parse('red')).to be_a(Croissant::Style::Value::Color)
     end
 
     it 'should read the same input differently in the other order' do
-      expect((keyword | colour).parse('red')).to be_a(keyword)
+      expect((keyword | colour).parse('red')).to be_a(Croissant::Style::Value::Keyword)
+    end
+  end
+
+  describe '#match' do
+    let(:keywords) { Croissant::Style::Type::Keyword.new(:a) | :b | :c }
+
+    it 'should answer a value one of its types accepts' do
+      expect(keywords.match(:a)).to eq(:a)
+    end
+
+    it 'should ask every type, not only the first' do
+      expect(keywords.match(:c)).to eq(:c)
+    end
+
+    it 'should answer nothing when none of them accepts it' do
+      expect(keywords.match(:d)).to be_nil
+    end
+
+    it 'should answer the value it was handed rather than one of its own' do
+      value = Croissant::Style::Value::Keyword.new(:b)
+
+      expect(keywords.match(value)).to be(value)
+    end
+
+    it 'should ask a narrowed type about a value of another kind without it raising' do
+      union = Croissant::Style::Type::Length.new(nil, 'px') | :auto
+
+      expect(union.match(Croissant::Style::Type::Keyword.new.parse('auto'))).to eq(:auto)
+    end
+
+    it 'should take anything when one of its types narrows nothing' do
+      expect((length | keywords).match(:d)).to eq(:d)
     end
   end
 
@@ -112,7 +144,7 @@ RSpec.describe Croissant::Style::Value::Union do
       expect(length | keyword).not_to eq(length | colour)
     end
 
-    it 'should not be equal to a bare class' do
+    it 'should not be equal to a bare type' do
       expect(described_class.new(length)).not_to eq(length)
     end
   end
@@ -132,8 +164,8 @@ RSpec.describe Croissant::Style::Value::Union do
 
   describe '#inspect' do
     it 'should show the types it combines' do
-      expected = '#<Croissant::Style::Value::Union ' \
-                 '[Croissant::Style::Value::Length, Croissant::Style::Value::Keyword]>'
+      expected = '#<Croissant::Style::Type::Union ' \
+                 '[#<Croissant::Style::Type::Length>, #<Croissant::Style::Type::Keyword>]>'
 
       expect((length | keyword).inspect).to eq(expected)
     end

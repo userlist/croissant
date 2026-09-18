@@ -30,8 +30,8 @@ RSpec.describe Croissant::Style::Declaration do
       expect(described_class.new('color', 'red').parsed_value).to be_a(Croissant::Style::Value::Color)
     end
 
-    it 'should read the same value differently for a property that wants no colour' do
-      expect(described_class.new('animation-name', 'red').parsed_value).to be_a(Croissant::Style::Value::Keyword)
+    it 'should read the same value differently for a property with no grammar of its own' do
+      expect(described_class.new('animation-name', 'red').parsed_value).to be_a(Croissant::Style::Value::Unparsed)
     end
 
     it 'should keep a value the property cannot recognize' do

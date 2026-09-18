@@ -1,20 +1,9 @@
 # frozen_string_literal: true
 
 class Croissant::Style::Value::Length < Croissant::Style::Value::Numeric
+  PIXEL = Croissant::Style::Unit.lookup('px')
+
   attr_reader :unit
-
-  PATTERN = /\A(#{NUMBER})([a-z]+)?\z/i
-
-  def self.parse(input)
-    match = PATTERN.match(input)
-    return unless match
-
-    number = Float(match[1])
-    unit = match[2]
-    return new(number, unit) if unit
-
-    new(number) if number.zero?
-  end
 
   def initialize(value, unit = 'px')
     @unit = Croissant::Style::Unit.lookup(unit)
@@ -30,6 +19,12 @@ class Croissant::Style::Value::Length < Croissant::Style::Value::Numeric
 
   def to_s
     "#{super}#{unit}"
+  end
+
+  def to_html
+    pixels = absolutize
+
+    pixels.to_f.round.to_s if pixels.unit == PIXEL
   end
 
   def ==(other)

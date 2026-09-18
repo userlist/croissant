@@ -3,270 +3,19 @@
 require 'spec_helper'
 
 RSpec.describe Croissant::Style::Value do
+  let(:generic) do
+    base = Croissant::Style::Type::Numeric.new | Croissant::Style::Type::Keyword.new |
+           Croissant::Style::Type::Color.new
+
+    base | Croissant::Style::Type::List.new(base) | Croissant::Style::Type::Unparsed.new
+  end
+
   def parse(input)
-    described_class.parse(input)
+    generic.parse(input)
   end
 
-  describe '.parse' do
-    it 'should parse a bare number as a number' do
-      expect(described_class.parse('1.5')).to be_a(Croissant::Style::Value::Number)
-    end
-
-    it 'should parse a length as a length' do
-      expect(described_class.parse('10px')).to be_a(Croissant::Style::Value::Length)
-    end
-
-    it 'should parse the unit of a length' do
-      expect(described_class.parse('10em').unit).to be(Croissant::Style::Unit.lookup('em'))
-    end
-
-    it 'should ignore the case of a unit' do
-      expect(described_class.parse('10PX')).to eq(described_class.parse('10px'))
-    end
-
-    it 'should parse a percentage as a percentage' do
-      expect(described_class.parse('50%')).to be_a(Croissant::Style::Value::Percentage)
-    end
-
-    it 'should parse a leading decimal point' do
-      expect(described_class.parse('.5em').to_f).to eq(0.5)
-    end
-
-    it 'should parse a signed number' do
-      expect(described_class.parse('-10px').to_f).to eq(-10.0)
-    end
-
-    it 'should strip surrounding whitespace' do
-      expect(described_class.parse('  10px  ')).to eq(described_class.parse('10px'))
-    end
-
-    it 'should parse an identifier as a keyword' do
-      expect(described_class.parse('auto')).to be_a(Croissant::Style::Value::Keyword)
-    end
-
-    it 'should parse a hyphenated identifier as a keyword' do
-      expect(described_class.parse('sans-serif')).to be_a(Croissant::Style::Value::Keyword)
-    end
-
-    it 'should parse a vendor-prefixed identifier as a keyword' do
-      expect(described_class.parse('-webkit-box')).to be_a(Croissant::Style::Value::Keyword)
-    end
-
-    it 'should parse a custom property name as a keyword' do
-      expect(described_class.parse('--brand-color')).to be_a(Croissant::Style::Value::Keyword)
-    end
-
-    it 'should parse a space-separated value as a list' do
-      expect(described_class.parse('1px solid red')).to be_a(Croissant::Style::Value::List)
-    end
-
-    it 'should parse a comma-separated value as a list' do
-      expect(described_class.parse('Arial, sans-serif')).to be_a(Croissant::Style::Value::List)
-    end
-
-    it 'should parse a hex colour as a colour' do
-      expect(described_class.parse('#fff')).to be_a(Croissant::Style::Value::Color)
-    end
-
-    it 'should parse a six-digit hex colour as a colour' do
-      expect(described_class.parse('#ff0000')).to be_a(Croissant::Style::Value::Color)
-    end
-
-    it 'should parse an rgb colour as a colour' do
-      expect(described_class.parse('rgb(255, 0, 0)')).to be_a(Croissant::Style::Value::Color)
-    end
-
-    it 'should parse an rgba colour as a colour' do
-      expect(described_class.parse('rgba(0, 0, 0, 0.5)')).to be_a(Croissant::Style::Value::Color)
-    end
-
-    it 'should parse a hex colour of an impossible length as unparsed' do
-      expect(described_class.parse('#fffff')).to be_a(Croissant::Style::Value::Unparsed)
-    end
-
-    it 'should parse a non-hex colour as unparsed' do
-      expect(described_class.parse('#gggggg')).to be_a(Croissant::Style::Value::Unparsed)
-    end
-
-    it 'should parse an rgb colour with too few channels as unparsed' do
-      expect(described_class.parse('rgb(1, 2)')).to be_a(Croissant::Style::Value::Unparsed)
-    end
-
-    it 'should parse a named colour as a keyword, having no property context' do
-      expect(described_class.parse('red')).to be_a(Croissant::Style::Value::Keyword)
-    end
-
-    it 'should parse a function it does not know as unparsed' do
-      expect(described_class.parse('calc(1px + 2px)')).to be_a(Croissant::Style::Value::Unparsed)
-    end
-
-    it 'should parse a quoted string as unparsed' do
-      expect(described_class.parse('"Helvetica Neue"')).to be_a(Croissant::Style::Value::Unparsed)
-    end
-
-    it 'should return nil for an empty value' do
-      expect(described_class.parse('')).to be_nil
-    end
-
-    it 'should return nil for nil' do
-      expect(described_class.parse(nil)).to be_nil
-    end
-
-    it 'should return a value it is given unchanged' do
-      value = described_class.parse('10px')
-
-      expect(described_class.parse(value)).to be(value)
-    end
-
-    it 'should try only the types it is given' do
-      keyword = Croissant::Style::Value::Keyword
-
-      expect(described_class.parse('10px', keyword)).to be_a(Croissant::Style::Value::Unparsed)
-    end
-
-    it 'should keep the text of a value none of its types recognize' do
-      keyword = Croissant::Style::Value::Keyword
-
-      expect(described_class.parse('10px', keyword).to_s).to eq('10px')
-    end
-
-    it 'should read a named colour as a colour when its types ask for one' do
-      colour = Croissant::Style::Value::Color | Croissant::Style::Value::Keyword
-
-      expect(described_class.parse('red', colour)).to be_a(Croissant::Style::Value::Color)
-    end
-
-    it 'should read a keyword a colour cannot resolve as a keyword' do
-      colour = Croissant::Style::Value::Color | Croissant::Style::Value::Keyword
-
-      expect(described_class.parse('currentcolor', colour)).to be_a(Croissant::Style::Value::Keyword)
-    end
-
-    it 'should apply its types to each element of a list' do
-      colour = Croissant::Style::Value::Color | Croissant::Style::Value::Keyword
-
-      expect(described_class.parse('red blue', colour).map(&:to_s)).to eq(['#ff0000', '#0000ff'])
-    end
-
-    it 'should still build a list when none of its types match the whole value' do
-      colour = Croissant::Style::Value::Color | Croissant::Style::Value::Keyword
-
-      expect(described_class.parse('red blue', colour)).to be_a(Croissant::Style::Value::List)
-    end
-  end
-
-  describe '.[]' do
-    it 'should parse the input' do
-      expect(described_class['10px']).to be_a(described_class::Length)
-    end
-
-    it 'should parse through the class it is called on' do
-      expect(described_class::Number['10px']).to be_nil
-    end
-
-    it 'should return nil for input the class does not recognize' do
-      expect(described_class::Length['auto']).to be_nil
-    end
-
-    it 'should build a keyword from a symbol' do
-      expect(described_class::Keyword[:auto]).to eq(described_class::Keyword.new(:auto))
-    end
-
-    it 'should take a type the way .parse does' do
-      colour = described_class::Color | described_class::Keyword
-
-      expect(described_class['red', colour]).to be_a(described_class::Color)
-    end
-  end
-
-  describe '.split' do
-    def split(input)
-      described_class::List.split(input)
-    end
-
-    it 'should split on top-level whitespace' do
-      expect(split('1px solid red')).to eq(%w[1px solid red])
-    end
-
-    it 'should return a single token unsplit' do
-      expect(split('1px')).to eq(['1px'])
-    end
-
-    it 'should keep a bracketed group together' do
-      expect(split('calc(1px + 2px) 3px')).to eq(['calc(1px + 2px)', '3px'])
-    end
-
-    it 'should keep a quoted string together' do
-      expect(split('"Helvetica Neue" 2px')).to eq(['"Helvetica Neue"', '2px'])
-    end
-
-    it 'should split on commas when given the segment pattern' do
-      segments = described_class::List::SEGMENTS
-
-      expect(described_class::List.split('Arial, sans-serif', segments)).to eq(%w[Arial sans-serif])
-    end
-
-    it 'should accept something that is not a string' do
-      expect(split(nil)).to eq([])
-    end
-  end
-
-  describe '.global_type' do
-    it 'should parse a CSS-wide keyword' do
-      expect(described_class.global_type.parse('inherit')).to eq(:inherit)
-    end
-
-    it 'should cover every CSS-wide keyword' do
-      names = %w[inherit initial unset revert revert-layer]
-      parsed = names.map { |name| described_class.global_type.parse(name) }
-
-      expect(parsed).to all(be_a(described_class::Keyword))
-    end
-
-    it 'should not parse anything else' do
-      expect(described_class.global_type.parse('auto')).to be_nil
-    end
-
-    it 'should be the same union on every call' do
-      first = described_class.global_type
-      second = described_class.global_type
-
-      expect(first).to be(second)
-    end
-  end
-
-  describe 'an integer' do
-    it 'should parse integral notation' do
-      expect(described_class::Integer['2']).to be_a(described_class::Integer)
-    end
-
-    it 'should parse a signed integer' do
-      expect(described_class::Integer['-2'].to_i).to eq(-2)
-    end
-
-    it 'should not parse a fractional number' do
-      expect(described_class::Integer['2.5']).to be_nil
-    end
-
-    it 'should not parse a length' do
-      expect(described_class::Integer['2px']).to be_nil
-    end
-
-    it 'should be a number, since CSS makes integers a subset of them' do
-      expect(described_class::Integer['2']).to be_a(described_class::Number)
-    end
-
-    it 'should serialize without a decimal point' do
-      expect(described_class::Integer['2'].to_s).to eq('2')
-    end
-
-    it 'should stay out of the generic chain, which has no property to ask' do
-      expect(described_class.parse('2')).to be_an_instance_of(described_class::Number)
-    end
-
-    it 'should stay out of the numeric chain too' do
-      expect(described_class::Numeric.parse('2')).to be_an_instance_of(described_class::Number)
-    end
+  def colour(input)
+    Croissant::Style::Type::Color.new.parse(input)
   end
 
   describe '#absolutize' do
@@ -384,12 +133,84 @@ RSpec.describe Croissant::Style::Value do
       expect((parse('50%') + parse('50%')).to_s).to eq('100%')
     end
 
+    it 'should take a remainder' do
+      expect((parse('10px') % 3).to_s).to eq('1px')
+    end
+
+    it 'should take a remainder of a value of its own kind' do
+      expect((parse('10') % parse('3')).to_s).to eq('1')
+    end
+
+    it 'should refuse a remainder of an incompatible value' do
+      expect { parse('10px') % parse('50%') }.to raise_error(ArgumentError)
+    end
+
     it 'should divide' do
       expect((parse('10px') / 4).to_s).to eq('2.5px')
     end
 
     it 'should round' do
       expect(parse('10.567px').round(1).to_s).to eq('10.6px')
+    end
+  end
+
+  describe 'the number it holds' do
+    it 'should keep a whole number whole' do
+      expect(parse('10px').inspect).to start_with('#<Croissant::Style::Value::Length 10 ')
+    end
+
+    it 'should keep a fractional number as it was written' do
+      expect(parse('1.5').inspect).to eq('#<Croissant::Style::Value::Number 1.5>')
+    end
+
+    it 'should read a whole number written with a decimal point as whole' do
+      expect(parse('10.0px')).to eql(parse('10px'))
+    end
+
+    it 'should keep arithmetic on whole numbers exact' do
+      expect((parse('10px') + parse('5px')).inspect).to start_with('#<Croissant::Style::Value::Length 15 ')
+    end
+
+    it 'should divide without falling into integer division' do
+      expect((parse('10') / 4).to_s).to eq('2.5')
+    end
+
+    it 'should answer a whole count for a unit that resolves to one' do
+      expect(parse('1in').absolutize.inspect).to start_with('#<Croissant::Style::Value::Length 96 ')
+    end
+  end
+
+  describe '#<=>' do
+    it 'should compare two values of the same kind' do
+      expect(parse('10px') <=> parse('5px')).to eq(1)
+    end
+
+    it 'should compare with a plain number read as a value of its kind' do
+      expect(parse('10px') <=> 5).to eq(1)
+    end
+
+    it 'should not compare lengths of different units' do
+      expect(parse('10px') <=> parse('5em')).to be_nil
+    end
+
+    it 'should not compare a length with a percentage' do
+      expect(parse('10px') <=> parse('50%')).to be_nil
+    end
+
+    it 'should be asked by a range covering the value' do
+      expect((0..).cover?(parse('10px'))).to be(true)
+    end
+
+    it 'should be asked by a range the value falls outside' do
+      expect((0..).cover?(parse('-10px'))).to be(false)
+    end
+
+    it 'should read the bounds of a range as values of its own kind' do
+      expect((0..100).cover?(parse('50%'))).to be(true)
+    end
+
+    it 'should leave a range over another unit covering nothing' do
+      expect((parse('0px')..parse('20px')).cover?(parse('10em'))).to be(false)
     end
   end
 
@@ -507,22 +328,6 @@ RSpec.describe Croissant::Style::Value do
   end
 
   describe 'a number' do
-    it 'should parse a bare number' do
-      expect(described_class::Numeric.parse('1.5')).to be_a(described_class::Number)
-    end
-
-    it 'should parse a length through the numeric family' do
-      expect(described_class::Numeric.parse('10px')).to be_a(described_class::Length)
-    end
-
-    it 'should parse a percentage through the numeric family' do
-      expect(described_class::Numeric.parse('50%')).to be_a(described_class::Percentage)
-    end
-
-    it 'should not parse something that is not a number' do
-      expect(described_class::Numeric.parse('auto')).to be_nil
-    end
-
     it 'should scale another value' do
       expect(parse('2')).to be_scalar
     end
@@ -545,54 +350,6 @@ RSpec.describe Croissant::Style::Value do
   end
 
   describe 'a keyword' do
-    it 'should parse an identifier' do
-      expect(described_class::Keyword.parse('auto')).to be_a(described_class::Keyword)
-    end
-
-    it 'should not parse something that is not an identifier' do
-      expect(described_class::Keyword.parse('1px solid red')).to be_nil
-    end
-
-    it 'should parse itself when used as a type' do
-      keyword = described_class::Keyword.new(:auto)
-
-      expect(keyword.parse('auto')).to be(keyword)
-    end
-
-    it 'should not parse a keyword other than itself' do
-      expect(described_class::Keyword.new(:auto).parse('none')).to be_nil
-    end
-
-    it 'should build a union when keywords are chained' do
-      allowed = described_class::Keyword[:auto] | described_class::Keyword[:none]
-
-      expect(allowed).to be_a(described_class::Union)
-    end
-
-    it 'should accept only the keywords chained into it' do
-      allowed = described_class::Keyword[:auto] | described_class::Keyword[:none]
-
-      expect(allowed.parse('block')).to be_nil
-    end
-
-    it 'should accept each keyword chained into it' do
-      allowed = described_class::Keyword[:auto] | described_class::Keyword[:none]
-
-      expect(allowed.parse('none')).to eq(:none)
-    end
-
-    it 'should combine with a class type from the left' do
-      type = described_class::Length | described_class::Keyword[:auto]
-
-      expect(type.parse('auto')).to eq(:auto)
-    end
-
-    it 'should combine with a class type from the right' do
-      type = described_class::Keyword[:auto] | described_class::Length
-
-      expect(type.parse('10px')).to be_a(described_class::Length)
-    end
-
     it 'should equal another keyword of the same name' do
       expect(parse('auto')).to eq(described_class::Keyword.new('auto'))
     end
@@ -647,14 +404,6 @@ RSpec.describe Croissant::Style::Value do
   end
 
   describe 'a colour' do
-    it 'should parse a colour notation' do
-      expect(described_class::Color.parse('#fff')).to be_a(described_class::Color)
-    end
-
-    it 'should not parse something that is not a colour' do
-      expect(described_class::Color.parse('auto')).to be_nil
-    end
-
     it 'should expand a three-digit hex colour' do
       expect(parse('#abc').to_s).to eq('#aabbcc')
     end
@@ -719,14 +468,6 @@ RSpec.describe Croissant::Style::Value do
   end
 
   describe 'a list' do
-    it 'should parse a space-separated value' do
-      expect(described_class::List.parse('0 auto')).to be_a(described_class::List)
-    end
-
-    it 'should not parse a single token' do
-      expect(described_class::List.parse('auto')).to be_nil
-    end
-
     it 'should parse each element in turn' do
       expect(parse('1px solid red').map(&:class)).to eq(
         [described_class::Length, described_class::Keyword, described_class::Keyword]
@@ -794,6 +535,91 @@ RSpec.describe Croissant::Style::Value do
     end
   end
 
+  describe 'a url' do
+    def url(source)
+      Croissant::Style::Value::Url.new(source)
+    end
+
+    it 'should answer the source it names' do
+      expect(url('images/hero.png').source).to eq('images/hero.png')
+    end
+
+    it 'should serialize as the function around it' do
+      expect(url('images/hero.png').to_s).to eq('url("images/hero.png")')
+    end
+
+    it 'should quote a source the unquoted form could not hold' do
+      expect(url('hero image.png').to_s).to eq('url("hero image.png")')
+    end
+
+    it 'should escape a quote in the source' do
+      expect(url('hero".png').to_s).to eq('url("hero\\".png")')
+    end
+
+    it 'should escape a backslash in the source' do
+      expect(url('hero\\.png').to_s).to eq('url("hero\\\\.png")')
+    end
+
+    it 'should equal another url naming the same source' do
+      first = url('a.png')
+      second = url('a.png')
+
+      expect(first).to eq(second)
+    end
+
+    it 'should keep itself as specified when absolutized' do
+      value = url('a.png')
+
+      expect(value.absolutize).to be(value)
+    end
+
+    it 'should be frozen' do
+      expect(url('a.png')).to be_frozen
+    end
+  end
+
+  describe '#to_html' do
+    it 'should write a keyword as it is written in CSS' do
+      expect(parse('auto').to_html).to eq('auto')
+    end
+
+    it 'should write a colour as it is written in CSS' do
+      expect(colour('red').to_html).to eq('#ff0000')
+    end
+
+    it 'should write a percentage as it is written in CSS' do
+      expect(parse('50%').to_html).to eq('50%')
+    end
+
+    it 'should write a length in pixels as a bare count' do
+      expect(parse('120px').to_html).to eq('120')
+    end
+
+    it 'should resolve a length in another absolute unit' do
+      expect(parse('1in').to_html).to eq('96')
+    end
+
+    it 'should round a count, which is all an attribute holds' do
+      expect(parse('10.6px').to_html).to eq('11')
+    end
+
+    it 'should round a bare number too' do
+      expect(parse('10.6').to_html).to eq('11')
+    end
+
+    it 'should not write a length that needs a font size to resolve' do
+      expect(parse('3em').to_html).to be_nil
+    end
+
+    it 'should not write a length in a unit it does not model' do
+      expect(parse('3ch').to_html).to be_nil
+    end
+
+    it 'should write a url as the source alone' do
+      expect(Croissant::Style::Value::Url.new('images/hero.png').to_html).to eq('images/hero.png')
+    end
+  end
+
   describe '#to_str' do
     it 'should convert to its serialized form' do
       expect(parse('10px').to_str).to eq('10px')
@@ -819,11 +645,11 @@ RSpec.describe Croissant::Style::Value do
     end
 
     it 'should not compare equal to a string for a value that normalizes' do
-      expect(Croissant::Style::Value::Color.parse('#abc') == '#abc').to be(false)
+      expect(colour('#abc') == '#abc').to be(false)
     end
 
     it 'should compare equal to the string a normalizing value serializes to' do
-      expect(Croissant::Style::Value::Color.parse('#abc') == '#aabbcc').to be(true)
+      expect(colour('#abc') == '#aabbcc').to be(true)
     end
 
     it 'should not raise when a length meets a string that is not one' do
@@ -831,7 +657,7 @@ RSpec.describe Croissant::Style::Value do
     end
 
     it 'should not raise when a colour meets a string that is not one' do
-      expect(Croissant::Style::Value::Color.parse('#abc') == 'auto').to be(false)
+      expect(colour('#abc') == 'auto').to be(false)
     end
 
     it 'should not raise when a list meets a string that is not one' do
@@ -842,74 +668,6 @@ RSpec.describe Croissant::Style::Value do
       length = parse('10px')
 
       expect([length, '10px'].uniq.size).to eq(2)
-    end
-  end
-
-  describe '.parse on a subclass' do
-    it 'should narrow a length to a length' do
-      expect(Croissant::Style::Value::Length.parse('10px')).to be_a(Croissant::Style::Value::Length)
-    end
-
-    it 'should refuse a length when asked for a number' do
-      expect(Croissant::Style::Value::Number.parse('10px')).to be_nil
-    end
-
-    it 'should refuse a length when asked for a percentage' do
-      expect(Croissant::Style::Value::Percentage.parse('10px')).to be_nil
-    end
-
-    it 'should refuse a percentage when asked for a number' do
-      expect(Croissant::Style::Value::Number.parse('50%')).to be_nil
-    end
-
-    it 'should still parse every member of the family from the head' do
-      expect(Croissant::Style::Value::Numeric.parse('50%')).to be_a(Croissant::Style::Value::Percentage)
-    end
-
-    it 'should read a unitless zero as a length' do
-      expect(Croissant::Style::Value::Length.parse('0')).to be_a(Croissant::Style::Value::Length)
-    end
-
-    it 'should give a unitless zero the pixel unit' do
-      expect(Croissant::Style::Value::Length.parse('0').to_s).to eq('0px')
-    end
-
-    it 'should refuse any other unitless number as a length' do
-      expect(Croissant::Style::Value::Length.parse('5')).to be_nil
-    end
-
-    it 'should still read a unitless zero as a number from the head' do
-      expect(Croissant::Style::Value::Numeric.parse('0')).to be_a(Croissant::Style::Value::Number)
-    end
-  end
-
-  describe 'a named colour' do
-    def colour(input)
-      Croissant::Style::Value::Color.parse(input)
-    end
-
-    it 'should parse a named colour' do
-      expect(colour('red').to_s).to eq('#ff0000')
-    end
-
-    it 'should ignore the case of a name' do
-      expect(colour('RebeccaPurple').to_s).to eq('#663399')
-    end
-
-    it 'should equal the same colour written as hex' do
-      expect(colour('red')).to eq(colour('#ff0000'))
-    end
-
-    it 'should parse transparent as a fully transparent colour' do
-      expect(colour('transparent').alpha).to eq(0.0)
-    end
-
-    it 'should not parse currentcolor, which needs an element to resolve' do
-      expect(colour('currentcolor')).to be_nil
-    end
-
-    it 'should not parse an identifier that is not a colour' do
-      expect(colour('notacolour')).to be_nil
     end
   end
 
@@ -925,17 +683,17 @@ RSpec.describe Croissant::Style::Value do
     end
 
     it 'should show the unit of a length' do
-      expected = '#<Croissant::Style::Value::Length 10.0 #<Croissant::Style::Unit::Pixel "px">>'
+      expected = '#<Croissant::Style::Value::Length 10 #<Croissant::Style::Unit::Pixel "px">>'
 
       expect(parse('10px').inspect).to eq(expected)
     end
 
     it 'should show the packed channels and the alpha of a colour' do
-      expect(described_class::Color.parse('red').inspect).to eq('#<Croissant::Style::Value::Color 0xff0000 1.0>')
+      expect(colour('red').inspect).to eq('#<Croissant::Style::Value::Color 0xff0000 1.0>')
     end
 
     it 'should show the alpha of a translucent colour, which to_s alone would hide' do
-      expect(described_class::Color.parse('rgba(0, 0, 0, 0.5)').inspect).to end_with('0x000000 0.5>')
+      expect(colour('rgba(0, 0, 0, 0.5)').inspect).to end_with('0x000000 0.5>')
     end
 
     it 'should tell a space list from a comma list' do
@@ -951,7 +709,7 @@ RSpec.describe Croissant::Style::Value do
     end
 
     it 'should not leak an object address from a colour' do
-      expect(described_class::Color.parse('#fff').inspect).not_to match(/0x\h{8,}/)
+      expect(colour('#fff').inspect).not_to match(/0x\h{8,}/)
     end
   end
 end

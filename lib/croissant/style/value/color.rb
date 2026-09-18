@@ -1,74 +1,16 @@
 # frozen_string_literal: true
 
 class Croissant::Style::Value::Color < Croissant::Style::Value
-  HEX = /\A#(\h+)\z/
-  FUNCTIONAL = /\Argba?\(([^()]*)\)\z/i
-  SEPARATOR = %r{[,/\s]+}
-  CHANNEL = /\A[-+]?(?:\d+(?:\.\d+)?|\.\d+)%?\z/
   OPAQUE = 1.0
-  TRANSPARENT = 'transparent'
 
   attr_reader :alpha
 
   class << self
-    def parse(input)
-      hex(input) || functional(input) || named(input)
-    end
-
     def build(red, green, blue, alpha = OPAQUE)
       new((byte(red) << 16) | (byte(green) << 8) | byte(blue), alpha)
     end
 
     private
-
-    def hex(input)
-      match = HEX.match(input)
-      return unless match && [3, 4, 6, 8].include?(match[1].length)
-
-      digits = match[1]
-      digits = digits.gsub(/\h/) { |digit| digit * 2 } if digits.length < 6
-      red, green, blue, alpha = digits.scan(/\h{2}/).map { |pair| pair.to_i(16) }
-
-      build(red, green, blue, alpha ? alpha / 255.0 : OPAQUE)
-    end
-
-    def named(input)
-      name = input.downcase
-
-      return new(0x000000, 0.0) if name == TRANSPARENT
-
-      rgb = NAMED[name]
-
-      new(rgb) if rgb
-    end
-
-    def functional(input)
-      match = FUNCTIONAL.match(input)
-      return unless match
-
-      parts = components(match[1])
-      return unless parts
-
-      red, green, blue = parts.first(3).map { |part| channel(part) }
-
-      build(red, green, blue, parts[3] ? fraction(parts[3]) : OPAQUE)
-    end
-
-    def components(text)
-      parts = text.split(SEPARATOR).reject(&:empty?)
-      return unless (3..4).cover?(parts.length) && parts.all? { |part| CHANNEL.match?(part) }
-
-      parts
-    end
-
-    # A channel is 0-255, or a percentage of it.
-    def channel(part)
-      part.end_with?('%') ? part.to_f * 255 / 100 : part.to_f
-    end
-
-    def fraction(part)
-      part.end_with?('%') ? part.to_f / 100 : part.to_f
-    end
 
     def byte(component)
       component.round.clamp(0, 255)
@@ -129,5 +71,3 @@ class Croissant::Style::Value::Color < Croissant::Style::Value
     (rounded % 1).zero? ? rounded.to_i.to_s : rounded.to_s
   end
 end
-
-require_relative 'color/named'

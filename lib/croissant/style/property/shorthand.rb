@@ -10,7 +10,7 @@ class Croissant::Style::Property::Shorthand < Croissant::Style::Property
   end
 
   def expand(declaration)
-    sides = expand_sides(Croissant::Style::Value::List.split(declaration.value))
+    sides = expand_sides(Croissant::Style::Type::List.split(declaration.value))
     return [] unless sides
 
     longhands.zip(sides).map do |longhand, value|

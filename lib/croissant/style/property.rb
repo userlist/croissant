@@ -20,7 +20,7 @@ class Croissant::Style::Property
     @name = name
     @inherited = inherited
     @shorthand = shorthand
-    @type = (type || Croissant::Style::Value.default_type) | Croissant::Style::Value.global_type
+    @type = Croissant::Style::Type.complete(type)
     @initial = parse_value(initial)
 
     freeze
@@ -31,7 +31,11 @@ class Croissant::Style::Property
   end
 
   def parse_value(value)
-    Croissant::Style::Value.parse(value, type)
+    return value if value.is_a?(Croissant::Style::Value)
+
+    value = value.to_s.strip
+
+    type.parse(value) unless value.empty?
   end
 
   def expand(declaration)

@@ -1,14 +1,11 @@
 # frozen_string_literal: true
 
 class Croissant::Style::Value::Numeric < Croissant::Style::Value
-  NUMBER = /[-+]?(?:\d+(?:\.\d+)?|\.\d+)/
-
-  def self.parse(input)
-    Number.parse(input) || Percentage.parse(input) || Length.parse(input)
-  end
-
   def initialize(value)
-    super(value.to_f)
+    value = value.to_f unless value.is_a?(::Numeric)
+    value = value.to_i if (value % 1).zero?
+
+    super
   end
 
   def +(other)
@@ -24,17 +21,26 @@ class Croissant::Style::Value::Numeric < Croissant::Style::Value
   end
 
   def /(other)
-    spawn(value / factor(other))
+    spawn(value.fdiv(factor(other)))
+  end
+
+  def %(other)
+    spawn(value % operand(other))
   end
 
   def round(...)
     spawn(value.round(...))
   end
 
-  def to_s
-    return value.to_i.to_s if (value % 1).zero?
+  def <=>(other)
+    other = spawn(other) if other.is_a?(::Numeric)
+    return unless compatible?(other)
 
-    super
+    value <=> other.value
+  end
+
+  def coerce(other)
+    [spawn(other), self]
   end
 
   def to_i

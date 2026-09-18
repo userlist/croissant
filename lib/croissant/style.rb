@@ -5,6 +5,7 @@ end
 
 require_relative 'style/unit'
 require_relative 'style/value'
+require_relative 'style/type'
 require_relative 'style/property'
 require_relative 'style/declaration'
 require_relative 'style/declaration_set'
