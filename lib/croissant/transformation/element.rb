@@ -3,11 +3,15 @@
 class Croissant::Transformation::Element
   class << self
     def selector(*values)
-      @selectors = values.flat_map { |value| parser.parse_selector_list(value) }.freeze
+      @selectors = values.flat_map { |value| parse_selector(value) }.freeze
     end
 
     def selectors
       @selectors ||= []
+    end
+
+    def parse_selector(value)
+      parser.parse_selector_list(value)
     end
 
     private
@@ -17,8 +21,12 @@ class Croissant::Transformation::Element
     end
   end
 
-  def selectors
-    self.class.selectors
+  attr_reader :selectors
+
+  def initialize(selector = nil)
+    selectors = Array(selector).flat_map { |value| self.class.parse_selector(value) }
+
+    @selectors = (selectors + self.class.selectors).freeze
   end
 
   def call(_element)
