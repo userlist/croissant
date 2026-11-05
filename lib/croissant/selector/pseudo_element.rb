@@ -23,7 +23,7 @@ class Croissant::Selector::PseudoElement < Croissant::Selector
   end
 
   def append_to(buffer)
-    buffer << '::' << name
+    append_identifier(buffer << '::', name)
     buffer << '(' << argument.to_s << ')' if argument
 
     buffer

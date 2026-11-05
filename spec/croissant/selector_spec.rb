@@ -107,6 +107,48 @@ RSpec.describe Croissant::Selector do
     it 'should canonicalize the odd/even keywords to their equivalent An+B formula' do
       expect(parse('li:nth-child(odd)').to_s).to eq('li:nth-child(2n+1)')
     end
+
+    it 'should round-trip escaped identifiers' do
+      selectors = ['.prose\:button', '.sm\:hidden', '.w-1\/2', '#\31 23', 'a.prose\:button:hover', '.a\ b']
+
+      expect(selectors.map { |selector| parse(selector).to_s }).to eq(selectors)
+    end
+
+    it 'should serialise an equivalent escape when the input used a different one' do
+      expect(parse('.\70 rose\3A button').to_s).to eq('.prose\:button')
+    end
+
+    it 'should escape a class name that is not a valid identifier' do
+      expect(Croissant::Selector::Simple::ClassName.new('prose:button').to_s).to eq('.prose\:button')
+    end
+
+    it 'should escape a leading digit as a code point' do
+      expect(Croissant::Selector::Simple::ClassName.new('10').to_s).to eq('.\31 0')
+    end
+
+    it 'should escape a digit after a leading hyphen as a code point' do
+      expect(Croissant::Selector::Simple::Id.new('-1x').to_s).to eq('#-\31 x')
+    end
+
+    it 'should escape a lone hyphen' do
+      expect(Croissant::Selector::Simple::ClassName.new('-').to_s).to eq('.\-')
+    end
+
+    it 'should escape control characters as code points' do
+      expect(Croissant::Selector::Simple::ClassName.new("a\tb").to_s).to eq('.a\9 b')
+    end
+
+    it 'should leave non-ASCII characters unescaped' do
+      expect(Croissant::Selector::Simple::ClassName.new('été').to_s).to eq('.été')
+    end
+
+    it 'should escape attribute names and pseudo-class names' do
+      expect(parse('[data\:x]:hov\:er').to_s).to eq('[data\:x]:hov\:er')
+    end
+
+    it 'should escape quotes and backslashes in an attribute value' do
+      expect(parse('[data-x=a\"b\\\\c]').to_s).to eq('[data-x="a\"b\\\\c"]')
+    end
   end
 
   describe '#to_str' do
@@ -171,6 +213,36 @@ RSpec.describe Croissant::Selector do
       element = element_for("<p class=\"a\tintro\nb\"></p>", './/p')
 
       expect(parse('.intro')).to be_matches(element)
+    end
+
+    it 'should match an escaped class against the unescaped class name' do
+      element = element_for('<a class="prose:button"></a>', './/a')
+
+      expect(parse('a.prose\:button')).to be_matches(element)
+    end
+
+    it 'should match a hex-escaped class against the decoded class name' do
+      element = element_for('<p class="10"></p>', './/p')
+
+      expect(parse('.\31 0')).to be_matches(element)
+    end
+
+    it 'should match an attribute value containing an escaped quote' do
+      element = element_for('<p title=\'say "hi"\'></p>', './/p')
+
+      expect(parse('p[title="say \"hi\""]')).to be_matches(element)
+    end
+
+    it 'should match escaped classes inside :is() and :not()' do
+      element = element_for('<p class="a,b"></p>', './/p')
+
+      expect(parse('p:is(.x, .a\,b):not(.c\))')).to be_matches(element)
+    end
+
+    it 'should match a hex-escaped ID against the decoded ID' do
+      element = element_for('<p id="123"></p>', './/p')
+
+      expect(parse('#\31 23')).to be_matches(element)
     end
 
     it 'should not match a class that is only a substring of another' do

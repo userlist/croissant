@@ -113,6 +113,38 @@ RSpec.describe Croissant::Stylesheet::Parser do
       end
     end
 
+    context 'with a selector containing an escaped quote before a quoted comma' do
+      let(:value) { 'a[title="x\"y,z"], p { color: red }' }
+
+      it 'should not split the selector inside the quoted value' do
+        expect(rules.map { |rule| rule.selector.to_s }).to eq(['a[title="x\"y,z"]', 'p'])
+      end
+    end
+
+    context 'with a selector containing an escaped comma' do
+      let(:value) { '.a\,b, p { color: red }' }
+
+      it 'should not split the selector at the escaped comma' do
+        expect(rules.map { |rule| rule.selector.to_s }).to eq(['.a\,b', 'p'])
+      end
+    end
+
+    context 'with a selector containing escaped braces' do
+      let(:value) { '.a\{b\} { color: red } p { color: blue }' }
+
+      it 'should keep the escaped braces in the selector' do
+        expect(rules.map(&:to_s)).to eq(['.a\{b\}{color:red}', 'p{color:blue}'])
+      end
+    end
+
+    context 'with a selector containing escaped brackets and parentheses' do
+      let(:value) { '.w-\[calc\(100\%-1rem\)\] { color: red }' }
+
+      it 'should keep the whole selector as a single class' do
+        expect(rules.first.selector.selectors.map(&:name)).to eq(['w-[calc(100%-1rem)]'])
+      end
+    end
+
     context 'with an important declaration' do
       let(:value) { 'p { color: red !important }' }
 
@@ -712,6 +744,182 @@ RSpec.describe Croissant::Stylesheet::Parser do
 
       it 'should not be inlinable' do
         expect(result).not_to be_inlinable
+      end
+    end
+
+    context 'with an escaped colon in a class name' do
+      let(:value) { 'a.prose\:button' }
+
+      it 'should return a compound of the type and a single unescaped class' do
+        expect(result.selectors).to contain_exactly(
+          have_attributes(class: Croissant::Selector::Simple::Type, name: 'a'),
+          have_attributes(class: Croissant::Selector::Simple::ClassName, name: 'prose:button')
+        )
+      end
+
+      it 'should be inlinable' do
+        expect(result).to be_inlinable
+      end
+    end
+
+    context 'with escaped characters in class names' do
+      let(:value) { '.w-1\/2.a\ b.bg-\[\#fff\]' }
+
+      it 'should unescape each class name' do
+        expect(result.selectors.map(&:name)).to eq(['w-1/2', 'a b', 'bg-[#fff]'])
+      end
+    end
+
+    context 'with a hex escape followed by a space' do
+      let(:value) { '.\31 0' }
+
+      it 'should consume the space as the end of the escape' do
+        expect(result.selectors.map(&:name)).to eq(['10'])
+      end
+    end
+
+    context 'with a six-digit hex escape' do
+      let(:value) { '.\0000311' }
+
+      it 'should stop the escape after six hex digits' do
+        expect(result.selectors.map(&:name)).to eq(['11'])
+      end
+    end
+
+    context 'with a hex escape for a non-ASCII code point' do
+      let(:value) { '.\E9 t\E9' }
+
+      it 'should decode the code point' do
+        expect(result.selectors.map(&:name)).to eq(['été'])
+      end
+    end
+
+    context 'with a hex escape for an invalid code point' do
+      let(:value) { '.a\0 b\D800 c\110000' }
+
+      it 'should replace each with U+FFFD' do
+        replacement = 0xFFFD.chr(Encoding::UTF_8)
+
+        expect(result.selectors.map(&:name)).to eq(["a#{replacement}b#{replacement}c#{replacement}"])
+      end
+    end
+
+    context 'with an escaped ID' do
+      let(:value) { '#\31 23' }
+
+      it 'should unescape the ID' do
+        expect(result.selectors).to contain_exactly(
+          have_attributes(class: Croissant::Selector::Simple::Id, name: '123')
+        )
+      end
+    end
+
+    context 'with an escaped type selector' do
+      let(:value) { 'my\-element' }
+
+      it 'should unescape the type' do
+        expect(result.selectors).to contain_exactly(
+          have_attributes(class: Croissant::Selector::Simple::Type, name: 'my-element')
+        )
+      end
+    end
+
+    context 'with an escaped pseudo-class name' do
+      let(:value) { 'li:first-\63 hild' }
+
+      it 'should recognise the unescaped pseudo-class' do
+        expect(result.selectors.last).to be_a(Croissant::Selector::PseudoClass::Structural::FirstChild)
+      end
+    end
+
+    context 'with an escaped attribute name' do
+      let(:value) { '[data\:x]' }
+
+      it 'should unescape the attribute name' do
+        expect(result.selectors.first).to have_attributes(name: 'data:x', operator: :exists)
+      end
+    end
+
+    context 'with an escaped unquoted attribute value' do
+      let(:value) { '[data-x=a\]b\ \31 0]' }
+
+      it 'should unescape the value, keeping escaped brackets and spaces' do
+        expect(result.selectors.first).to have_attributes(name: 'data-x', value: 'a]b 10')
+      end
+    end
+
+    context 'with an escaped quoted attribute value' do
+      let(:value) { '[title="a\:b"]' }
+
+      it 'should unescape the value' do
+        expect(result.selectors.first).to have_attributes(name: 'title', value: 'a:b')
+      end
+    end
+
+    context 'with an escaped double quote in a double-quoted attribute value' do
+      let(:value) { '[title="a\"b"][lang=en]' }
+
+      it 'should not end the value at the escaped quote' do
+        expect(result.selectors).to contain_exactly(
+          have_attributes(name: 'title', value: 'a"b'),
+          have_attributes(name: 'lang', value: 'en')
+        )
+      end
+    end
+
+    context 'with an escaped single quote in a single-quoted attribute value' do
+      let(:value) { "[title='a\\'b']" }
+
+      it 'should not end the value at the escaped quote' do
+        expect(result.selectors.first).to have_attributes(value: "a'b")
+      end
+    end
+
+    context 'with an escaped backslash before the closing quote' do
+      let(:value) { '[title="a\\\\"]' }
+
+      it 'should end the value at the quote' do
+        expect(result.selectors.first).to have_attributes(value: 'a\\')
+      end
+    end
+
+    context 'with an escaped parenthesis in a :not() argument' do
+      let(:value) { ':not(.a\))' }
+
+      it 'should not end the argument at the escaped parenthesis' do
+        expect(result.selectors.first.selectors.map(&:to_s)).to eq(['.a\)'])
+      end
+    end
+
+    context 'with an escaped backslash before the closing parenthesis' do
+      let(:value) { ':not(.a\\\\)' }
+
+      it 'should end the argument at the parenthesis' do
+        expect(result.selectors.first.selectors.map(&:to_s)).to eq(['.a\\\\'])
+      end
+    end
+
+    context 'with an escaped comma in an :is() argument' do
+      let(:value) { ':is(.a\,b, .c)' }
+
+      it 'should only split the argument at the unescaped comma' do
+        expect(result.selectors.first.selectors.map(&:to_s)).to eq(['.a\,b', '.c'])
+      end
+    end
+
+    context 'with escaped parentheses in a :has() argument' do
+      let(:value) { 'div:has(> .a\(b, ~ .c\))' }
+
+      it 'should keep each escaped parenthesis in its relative selector' do
+        expect(result.selectors.last.to_s).to eq(':has(> .a\(b, ~ .c\))')
+      end
+    end
+
+    context 'with a backslash before a newline' do
+      let(:value) { ".a\\\nb" }
+
+      it 'should end the identifier at the backslash, as it is not a valid escape' do
+        expect(result.left.selectors.first).to have_attributes(name: 'a')
       end
     end
   end

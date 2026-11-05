@@ -10,6 +10,6 @@ class Croissant::Selector::Simple::Id < Croissant::Selector::Simple
   end
 
   def append_to(buffer)
-    buffer << '#' << name
+    append_identifier(buffer << '#', name)
   end
 end

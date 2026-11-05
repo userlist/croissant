@@ -11,7 +11,7 @@ class Croissant::Selector::PseudoClass::Unknown < Croissant::Selector::PseudoCla
   end
 
   def append_to(buffer)
-    buffer << ':' << name
+    append_identifier(buffer << ':', name)
     buffer << '(' << argument.to_s << ')' if argument
 
     buffer

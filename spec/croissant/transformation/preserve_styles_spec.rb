@@ -42,6 +42,12 @@ RSpec.describe Croissant::Transformation::PreserveStyles do
     expect(html).to start_with('<style>p::before{content:"x"}</style>')
   end
 
+  it 'should re-emit rules with escaped class names with their escapes intact' do
+    html = process('<style>.body-content a.prose\:button:hover { color: red }</style>')
+
+    expect(html).to start_with('<style>.body-content a.prose\:button:hover{color:red}</style>')
+  end
+
   it 'should not re-emit inlinable rules' do
     expect(process('<style>p { color: blue } p:first-child { color: red }</style><p>a</p>')).to eq('<p>a</p>')
   end

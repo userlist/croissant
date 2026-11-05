@@ -14,14 +14,16 @@ class Croissant::Stylesheet::Parser
 
   QUOTED_DOUBLE = /(?:\\.|[^\\"])*"/m
   QUOTED_SINGLE = /(?:\\.|[^\\'])*'/m
-  PAREN_SPECIALS = /['"()]/
-  BRACKET_SPECIALS = /['"\[\]]/
+  # Every boundary also stops at a backslash, so the escaped character after it (`.sm\:hidden`,
+  # `.a\,b`, `.w-\[50\%\]`) is skipped rather than read as structure.
+  PAREN_SPECIALS = /['"()\\]/
+  BRACKET_SPECIALS = /['"\[\]\\]/
 
-  PRELUDE_BOUNDARY = %r{[\{;\}'"(\[/]}
-  BLOCK_BOUNDARY = %r{[\}'"(\[/]}
-  RULE_BOUNDARY = %r{[\{\}'"(\[/]}
-  DECLARATION_BOUNDARY = %r{[;'"(\[/]}
-  SELECTOR_BOUNDARY = %r{[,'"(\[/]}
+  PRELUDE_BOUNDARY = %r{[\{;\}'"(\[/\\]}
+  BLOCK_BOUNDARY = %r{[\}'"(\[/\\]}
+  RULE_BOUNDARY = %r{[\{\}'"(\[/\\]}
+  DECLARATION_BOUNDARY = %r{[;'"(\[/\\]}
+  SELECTOR_BOUNDARY = %r{[,'"(\[/\\]}
 
   LEFT_BRACE = '{'.ord
   RIGHT_BRACE = '}'.ord
@@ -36,6 +38,8 @@ class Croissant::Stylesheet::Parser
   RIGHT_PAREN = ')'.ord
   LEFT_BRACKET = '['.ord
   RIGHT_BRACKET = ']'.ord
+  BACKSLASH = '\\'.ord
+  ASCII_LIMIT = 0x80
 
   def self.parse(content)
     new.parse(content)
@@ -348,6 +352,7 @@ class Croissant::Stylesheet::Parser
 
   def advance_nested(scanner, byte)
     case byte
+    when BACKSLASH then skip_escaped(scanner)
     when DOUBLE_QUOTE then scanner.skip(QUOTED_DOUBLE) || scanner.terminate
     when SINGLE_QUOTE then scanner.skip(QUOTED_SINGLE) || scanner.terminate
     when LEFT_PAREN then advance_balanced(scanner, LEFT_PAREN, RIGHT_PAREN, PAREN_SPECIALS)
@@ -365,9 +370,17 @@ class Croissant::Stylesheet::Parser
       case string.getbyte(scanner.pos - 1)
       when open then depth += 1
       when close then depth -= 1
+      when BACKSLASH then skip_escaped(scanner)
       when DOUBLE_QUOTE then scanner.skip(QUOTED_DOUBLE) || scanner.terminate
       when SINGLE_QUOTE then scanner.skip(QUOTED_SINGLE) || scanner.terminate
       end
     end
+  end
+
+  # Only an ASCII character can be mistaken for a boundary, and stepping over one byte of a multibyte
+  # character would leave the scanner inside it.
+  def skip_escaped(scanner)
+    byte = scanner.string.getbyte(scanner.pos)
+    scanner.pos += 1 if byte && byte < ASCII_LIMIT
   end
 end

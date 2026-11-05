@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'strscan'
+
 class Croissant::Selector::Parser
   LEGACY_PSEUDO_ELEMENTS = %w[
     before
@@ -43,6 +45,7 @@ class Croissant::Selector::Parser
   ASTERISK = '*'.ord
   DOUBLE_QUOTE = '"'.ord
   SINGLE_QUOTE = "'".ord
+  BACKSLASH = '\\'.ord
   UPPERCASE = (('A'.ord)..('Z'.ord))
   LOWERCASE = (('a'.ord)..('z'.ord))
   DIGITS = (('0'.ord)..('9'.ord))
@@ -101,6 +104,12 @@ class Croissant::Selector::Parser
   TYPE_START_BYTES = Array.new(256) do |byte|
     UPPERCASE.cover?(byte) || LOWERCASE.cover?(byte)
   end.freeze
+  # A backslash and the character after it, or up to six hex digits naming a code point and one
+  # optional whitespace character ending them. https://developer.mozilla.org/en-US/docs/Web/CSS/ident
+  ESCAPE = /\\(?:(\h{1,6})(?:\r\n|[ \t\r\n\f])?|([^\r\n\f]))/
+  SURROGATES = (0xD800..0xDFFF)
+  MAXIMUM_CODE_POINT = 0x10FFFF
+  REPLACEMENT_CHARACTER = 0xFFFD.chr(Encoding::UTF_8).freeze
   NTH_KEYWORDS = { 'odd' => [2, 1], 'even' => [2, 0] }.freeze
   NTH_INTEGER = /\A[+-]?\d+\z/
   NTH_FORMULA = /\A([+-]?\d*)n\s*([+-]\s*\d+)?\z/
@@ -200,11 +209,11 @@ class Croissant::Selector::Parser
       byte = text.getbyte(position)
 
       if TYPE_START_BYTES[byte]
-        length = word_length(text, position + 1, stop)
+        name = scan_ident(text, position, stop)
         builder.flush!
         builder.start!
-        builder.add(Croissant::Selector::Simple::Type.new(text.byteslice(position, 1 + length)))
-        position += 1 + length
+        builder.add(Croissant::Selector::Simple::Type.new(name))
+        position = @position
         next
       elsif (combinator = COMBINATOR_SYMBOLS[byte])
         builder.combinator!(combinator)
@@ -214,21 +223,19 @@ class Croissant::Selector::Parser
 
       case byte
       when HASH
-        length = word_length(text, position + 1, stop)
-        if length.positive?
+        if (name = scan_ident(text, position + 1, stop))
           builder.flush!
           builder.start!
-          builder.add(Croissant::Selector::Simple::Id.new(text.byteslice(position + 1, length)))
+          builder.add(Croissant::Selector::Simple::Id.new(name))
         end
-        position += 1 + length
+        position = @position
       when DOT
-        length = word_length(text, position + 1, stop)
-        if length.positive?
+        if (name = scan_ident(text, position + 1, stop))
           builder.flush!
           builder.start!
-          builder.add(Croissant::Selector::Simple::ClassName.new(text.byteslice(position + 1, length)))
+          builder.add(Croissant::Selector::Simple::ClassName.new(name))
         end
-        position += 1 + length
+        position = @position
       when COLON
         @position = position
         pseudo = parse_pseudo(text, stop)
@@ -279,15 +286,10 @@ class Croissant::Selector::Parser
   def parse_pseudo(text, stop) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/PerceivedComplexity
     return parse_pseudo_element(text, stop) if text.getbyte(@position + 1) == COLON
 
-    length = word_length(text, @position + 1, stop)
-    if length.zero?
-      @position += 1
-      return
-    end
+    name = scan_ident(text, @position + 1, stop)
+    return unless name
 
-    name = text.byteslice(@position + 1, length)
     name.downcase!
-    @position += 1 + length
 
     return Croissant::Selector::PseudoElement.new(name) if legacy_pseudo_element?(name)
 
@@ -306,14 +308,9 @@ class Croissant::Selector::Parser
   end
 
   def parse_pseudo_element(text, stop)
-    length = word_length(text, @position + 2, stop)
-    if length.zero?
-      @position += 2
-      return
-    end
+    name = scan_ident(text, @position + 2, stop)
+    return unless name
 
-    name = text.byteslice(@position + 2, length)
-    @position += 2 + length
     argument = parse_argument(text, stop) if text.getbyte(@position) == LEFT_PAREN
 
     Croissant::Selector::PseudoElement.new(name, argument:)
@@ -393,6 +390,7 @@ class Croissant::Selector::Parser
         start = position + 1
       else
         case byte
+        when BACKSLASH then position += 1 if position + 1 < stop
         when LEFT_PAREN, LEFT_BRACKET then depth += 1
         when RIGHT_PAREN, RIGHT_BRACKET then depth -= 1
         end
@@ -404,11 +402,10 @@ class Croissant::Selector::Parser
     parts.reject(&:empty?)
   end
 
-  def parse_attribute(text, stop) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def parse_attribute(text, stop) # rubocop:disable Metrics/MethodLength
     @position = skip_whitespace(text, @position, stop)
-    length = word_length(text, @position, stop)
-    name = text.byteslice(@position, length)
-    @position = skip_whitespace(text, @position + length, stop)
+    name = scan_ident(text, @position, stop) || ''
+    @position = skip_whitespace(text, @position, stop)
 
     operator = parse_attribute_operator(text, stop)
     value = nil
@@ -444,20 +441,38 @@ class Croissant::Selector::Parser
     byte = text.getbyte(@position)
     return parse_quoted_attribute_value(text, byte, stop) if QUOTE_BYTES.include?(byte)
 
-    length = 0
-    length += 1 while @position + length < stop && !attribute_value_boundary?(text.getbyte(@position + length))
-    value = text.byteslice(@position, length)
-    @position += length
+    start = @position
+    while @position < stop && !attribute_value_boundary?(byte = text.getbyte(@position))
+      # An escaped `]` or the whitespace ending a hex escape is part of the value.
+      @position += (byte == BACKSLASH && escape_length(text, @position)) || 1
+    end
 
-    value
+    unescape(text.byteslice(start, @position - start))
   end
 
   def parse_quoted_attribute_value(text, quote, stop)
-    closing = text.byteindex(quote.chr, @position + 1) || stop
-    value = text.byteslice(@position + 1, closing - @position - 1)
+    start = @position + 1
+    closing = closing_quote_index(text, quote, start, stop)
+    value = text.byteslice(start, closing - start)
     @position = closing + 1
 
-    value
+    unescape(value)
+  end
+
+  def closing_quote_index(text, quote, position, stop)
+    closing = text.byteindex(quote.chr, position) || stop
+    backslash = text.byteindex('\\', position)
+    return closing if backslash.nil? || backslash > closing
+
+    while position < stop
+      byte = text.getbyte(position)
+      return position if byte == quote
+
+      # An escaped quote, or escaped backslash, does not close the string.
+      position += byte == BACKSLASH ? 2 : 1
+    end
+
+    stop
   end
 
   def attribute_value_boundary?(byte)
@@ -493,7 +508,8 @@ class Croissant::Selector::Parser
     return stop unless closing
 
     opening = text.byteindex(OPENING_PAREN, position)
-    return closing if opening.nil? || opening > closing
+    backslash = text.byteindex('\\', position)
+    return closing if (opening.nil? || opening > closing) && (backslash.nil? || backslash > closing)
 
     scan_matching_paren(text, position, stop)
   end
@@ -503,6 +519,7 @@ class Croissant::Selector::Parser
 
     while position < stop
       case text.getbyte(position)
+      when BACKSLASH then position += 1
       when LEFT_PAREN then depth += 1
       when RIGHT_PAREN
         depth -= 1
@@ -513,6 +530,44 @@ class Croissant::Selector::Parser
     end
 
     stop
+  end
+
+  # The ident sequence at position, unescaped, leaving @position after it. Answers nil when there is
+  # none. Without escapes, which is nearly always, it is a single slice of text.
+  def scan_ident(text, position, stop)
+    @position = position + word_length(text, position, stop)
+    return scan_escaped_ident(text, position, stop) if text.getbyte(@position) == BACKSLASH
+
+    text.byteslice(position, @position - position) if @position > position
+  end
+
+  def scan_escaped_ident(text, position, stop)
+    while text.getbyte(@position) == BACKSLASH && (length = escape_length(text, @position))
+      @position += length
+      @position += word_length(text, @position, stop)
+    end
+
+    unescape(text.byteslice(position, @position - position)) if @position > position
+  end
+
+  def escape_length(text, position)
+    scanner = (@escape_scanner ||= StringScanner.new(''))
+    scanner.string = text
+    scanner.pos = position
+    scanner.skip(ESCAPE)
+  end
+
+  def unescape(text)
+    return text unless text.include?('\\')
+
+    text.gsub(ESCAPE) do
+      hex = Regexp.last_match(1)
+      next Regexp.last_match(2) unless hex
+
+      code = hex.to_i(16)
+      invalid = code.zero? || code > MAXIMUM_CODE_POINT || SURROGATES.cover?(code)
+      invalid ? REPLACEMENT_CHARACTER : code.chr(Encoding::UTF_8)
+    end
   end
 
   def word_length(text, position, stop)

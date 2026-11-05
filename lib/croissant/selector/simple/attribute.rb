@@ -37,10 +37,10 @@ class Croissant::Selector::Simple::Attribute < Croissant::Selector::Simple
   end
 
   def append_to(buffer)
-    buffer << '[' << name
+    append_identifier(buffer << '[', name)
     return buffer << ']' if operator == :exists
 
-    buffer << OPERATOR_TOKENS.fetch(operator) << '"' << value.to_s << '"'
+    append_string(buffer << OPERATOR_TOKENS.fetch(operator), value.to_s)
     buffer << ' i' if case_insensitive?
 
     buffer << ']'

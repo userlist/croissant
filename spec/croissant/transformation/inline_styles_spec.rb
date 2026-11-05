@@ -89,4 +89,11 @@ RSpec.describe Croissant::Transformation::InlineStyles do
 
     expect(html.delete("\n")).to eq('<div><p style="color:red">a</p><p>b</p></div>')
   end
+
+  it 'should inline rules with escaped class names' do
+    html = process('<style>.body-content a.prose\:button { color: #fff !important }</style>' \
+                   '<div class="body-content"><a class="prose:button">x</a></div>')
+
+    expect(html).to eq('<div class="body-content"><a class="prose:button" style="color:#fff !important">x</a></div>')
+  end
 end
