@@ -6,6 +6,10 @@ class Croissant::Selector::PseudoClass::Structural::Root < Croissant::Selector::
     parent.nil? || !parent.element?
   end
 
+  def inlinable?
+    false
+  end
+
   private
 
   def keyword

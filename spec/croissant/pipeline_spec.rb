@@ -38,6 +38,30 @@ RSpec.describe Croissant::Pipeline do
       end
     end
 
+    context 'with a :root rule' do
+      let(:html) do
+        process(<<~HTML)
+          <!doctype html>
+          <html>
+            <head><style>:root { --brand: red; color: blue } p { color: red }</style></head>
+            <body><p>a</p></body>
+          </html>
+        HTML
+      end
+
+      it 'should not inline the rule into the html element' do
+        expect(html).to include('<html>')
+      end
+
+      it 'should preserve the rule in a style element' do
+        expect(html).to include('<style>:root{--brand:red;color:blue}</style>')
+      end
+
+      it 'should still inline the other rules' do
+        expect(html).to include('<p style="color:red">a</p>')
+      end
+    end
+
     it 'should leave html without styles untouched' do
       expect(process('<p>a</p>')).to eq('<p>a</p>')
     end

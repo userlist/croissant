@@ -632,6 +632,14 @@ RSpec.describe Croissant::Selector do
       expect(parse('li:first-child')).to be_inlinable
     end
 
+    it 'should not be inlinable for :root' do
+      expect(parse(':root')).not_to be_inlinable
+    end
+
+    it 'should not be inlinable for a type selector qualified by :root' do
+      expect(parse('html:root')).not_to be_inlinable
+    end
+
     it 'should not be inlinable for a dynamic pseudo-class' do
       expect(parse('a:hover')).not_to be_inlinable
     end
