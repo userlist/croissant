@@ -38,3 +38,4 @@ end
 require_relative 'at_rule/statement'
 require_relative 'at_rule/conditional_group'
 require_relative 'at_rule/block'
+require_relative 'at_rule/declaration_block'

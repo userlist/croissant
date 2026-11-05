@@ -307,14 +307,21 @@ RSpec.describe Croissant::Stylesheet::Parser do
     context 'with a font-face at-rule' do
       let(:value) { '@font-face { font-family: Custom; src: url(font.woff) } p { color: red }' }
 
-      it 'should capture the raw block' do
+      it 'should parse the declarations' do
         expect(rules.first).to eq(
-          Croissant::Stylesheet::AtRule::Block.new(
+          Croissant::Stylesheet::AtRule::DeclarationBlock.new(
             name: 'font-face',
             prelude: '',
-            body: 'font-family: Custom; src: url(font.woff)'
+            declarations: [
+              Croissant::Stylesheet::Declaration.new(property: 'font-family', value: 'Custom'),
+              Croissant::Stylesheet::Declaration.new(property: 'src', value: 'url(font.woff)')
+            ]
           )
         )
+      end
+
+      it 'should serialize minified' do
+        expect(rules.first.to_s).to eq('@font-face{font-family:Custom;src:url(font.woff)}')
       end
 
       it 'should keep following rules in source order' do
@@ -397,10 +404,24 @@ RSpec.describe Croissant::Stylesheet::Parser do
     end
 
     context 'with a comment in a raw at-rule body' do
-      let(:value) { '@font-face { /* local */ font-family: Custom }' }
+      let(:value) { '@keyframes spin { /* start */ from { opacity: 0 } }' }
 
       it 'should keep the comment in the body' do
-        expect(rules.first.body).to eq('/* local */ font-family: Custom')
+        expect(rules.first.body).to eq('/* start */ from { opacity: 0 }')
+      end
+    end
+
+    context 'with a font-face at-rule with comments, quoted values and a format list' do
+      let(:value) do
+        '@font-face { /* brand */ font-family: "My Font"; ' \
+          'src: url("a.woff2") format("woff2"), url(\'a;b.woff\') format("woff"); unicode-range: U+0000-00FF }'
+      end
+
+      it 'should drop the comments and keep the values intact' do
+        expect(rules.first.to_s).to eq(
+          '@font-face{font-family:"My Font";' \
+          'src:url("a.woff2") format("woff2"), url(\'a;b.woff\') format("woff");unicode-range:U+0000-00FF}'
+        )
       end
     end
 
@@ -484,10 +505,82 @@ RSpec.describe Croissant::Stylesheet::Parser do
     end
 
     context 'with a declaration without a colon' do
-      let(:value) { 'p { color }' }
+      let(:value) { 'p { color } a { color: red }' }
 
-      it 'should skip the declaration' do
-        expect(rules.first.declarations).to be_empty
+      it 'should skip the declaration and the rule it leaves empty' do
+        expect(rules.map { |rule| rule.selector.to_s }).to eq(['a'])
+      end
+    end
+
+    context 'with an empty rule block' do
+      let(:value) { 'p {} a:hover { } b { color: red }' }
+
+      it 'should drop the empty rules' do
+        expect(rules.map { |rule| rule.selector.to_s }).to eq(['b'])
+      end
+    end
+
+    context 'with a rule block containing only comments and semicolons' do
+      let(:value) { 'p { /* nothing */ ; ; }' }
+
+      it 'should drop the rule' do
+        expect(rules).to be_empty
+      end
+    end
+
+    context 'with an empty conditional group' do
+      let(:value) { '@media print {} @supports (display: grid) { } p { color: red }' }
+
+      it 'should drop the group' do
+        expect(rules.map(&:class)).to eq([Croissant::Stylesheet::Rule])
+      end
+    end
+
+    context 'with a conditional group containing only empty rules' do
+      let(:value) { '@media print { p {} @supports (display: grid) { a { } } } p { color: red }' }
+
+      it 'should drop the group' do
+        expect(rules.map(&:class)).to eq([Croissant::Stylesheet::Rule])
+      end
+    end
+
+    context 'with an empty font-face at-rule' do
+      let(:value) { '@font-face {} p { color: red }' }
+
+      it 'should drop the at-rule' do
+        expect(rules.map(&:class)).to eq([Croissant::Stylesheet::Rule])
+      end
+    end
+
+    context 'with a font-face at-rule containing only comments and semicolons' do
+      let(:value) { '@font-face { /* todo */ ; }' }
+
+      it 'should drop the at-rule' do
+        expect(rules).to be_empty
+      end
+    end
+
+    context 'with an empty page at-rule' do
+      let(:value) { '@page :first { } p { color: red }' }
+
+      it 'should drop the at-rule' do
+        expect(rules.map(&:class)).to eq([Croissant::Stylesheet::Rule])
+      end
+    end
+
+    context 'with a page at-rule containing a margin box' do
+      let(:value) { '@page { @top-center { content: "Title" } }' }
+
+      it 'should keep the at-rule' do
+        expect(rules.first.body).to eq('@top-center { content: "Title" }')
+      end
+    end
+
+    context 'with an empty keyframes at-rule' do
+      let(:value) { '@keyframes spin {}' }
+
+      it 'should keep the at-rule, since it still overrides earlier keyframes of the same name' do
+        expect(rules.first).to be_a(Croissant::Stylesheet::AtRule::Block)
       end
     end
 

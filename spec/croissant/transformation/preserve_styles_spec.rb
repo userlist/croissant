@@ -15,6 +15,18 @@ RSpec.describe Croissant::Transformation::PreserveStyles do
     expect(html).to eq('<style>@media print{p{color:red}}</style><p>a</p>')
   end
 
+  it 'should not re-emit empty rule blocks' do
+    html = process('<style>a:hover {} @media print { p { } } a:focus { color: red }</style><p>a</p>')
+
+    expect(html).to eq('<style>a:focus{color:red}</style><p>a</p>')
+  end
+
+  it 'should not add a style element when only empty rule blocks need preserving' do
+    html = process('<style>a:hover {} :root { }</style><p>a</p>')
+
+    expect(html).to eq('<p>a</p>')
+  end
+
   it 'should re-emit keyframes at-rules with their body intact' do
     css = '@keyframes spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }'
     html = process("<style>#{css}</style>")
@@ -27,7 +39,7 @@ RSpec.describe Croissant::Transformation::PreserveStyles do
   it 'should re-emit font-face and import at-rules' do
     html = process('<style>@import url(a.css); @font-face { font-family: X }</style>')
 
-    expect(html).to start_with("<style>@import url(a.css);\n@font-face{font-family: X}</style>")
+    expect(html).to start_with("<style>@import url(a.css);\n@font-face{font-family:X}</style>")
   end
 
   it 'should re-emit rules with dynamic pseudo-classes' do

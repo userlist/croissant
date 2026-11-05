@@ -8,6 +8,7 @@ class Croissant::Stylesheet::Parser
 
   AT_RULE_NAME = /[\w-]*/
   CONDITIONAL_GROUP_NAMES = %w[media supports].freeze
+  DECLARATION_BLOCK_NAMES = %w[font-face].freeze
   WHITESPACE = /\s+/
   COMMENT_OPEN = %r{/\*}
   COMMENT_CLOSE = %r{\*/}
@@ -132,19 +133,40 @@ class Croissant::Stylesheet::Parser
     at_rule = build_at_rule(scanner, name, prelude.strip, terminator)
 
     scanner.pos -= 1 if terminator == RIGHT_BRACE
-    rules << at_rule unless name.empty?
+    rules << at_rule unless at_rule.nil? || name.empty?
   end
 
   def build_at_rule(scanner, name, prelude, terminator)
     return Croissant::Stylesheet::AtRule::Statement.new(name:, prelude:) unless terminator == LEFT_BRACE
 
-    if CONDITIONAL_GROUP_NAMES.include?(name)
-      rules = parse_rule_list(scanner, nested: true)
-
-      Croissant::Stylesheet::AtRule::ConditionalGroup.new(name:, prelude:, rules:)
-    else
-      Croissant::Stylesheet::AtRule::Block.new(name:, prelude:, body: scan_raw_block(scanner).strip)
+    case name
+    when *CONDITIONAL_GROUP_NAMES then build_conditional_group(scanner, name, prelude)
+    when *DECLARATION_BLOCK_NAMES then build_declaration_block(scanner, name, prelude)
+    else build_raw_block(scanner, name, prelude)
     end
+  end
+
+  def build_conditional_group(scanner, name, prelude)
+    rules = parse_rule_list(scanner, nested: true)
+    return if rules.empty?
+
+    Croissant::Stylesheet::AtRule::ConditionalGroup.new(name:, prelude:, rules:)
+  end
+
+  def build_declaration_block(scanner, name, prelude)
+    block, _terminator = scan_block_body(scanner)
+    declarations = parse_declarations(block)
+    return if declarations.empty?
+
+    Croissant::Stylesheet::AtRule::DeclarationBlock.new(name:, prelude:, declarations:)
+  end
+
+  def build_raw_block(scanner, name, prelude)
+    body = scan_raw_block(scanner).strip
+    # @page mixes declarations with margin-box at-rules, so it stays raw but is dropped when empty.
+    return if name == 'page' && parse_declarations(body).empty?
+
+    Croissant::Stylesheet::AtRule::Block.new(name:, prelude:, body:)
   end
 
   def consume_rule(scanner, rules)
@@ -156,6 +178,7 @@ class Croissant::Stylesheet::Parser
   def consume_declaration_block(scanner, prelude, rules)
     block, _terminator = scan_block_body(scanner)
     declarations = parse_declarations(block)
+    return if declarations.empty?
 
     split_segments(prelude).each do |segment|
       selector = parse_selector(segment)

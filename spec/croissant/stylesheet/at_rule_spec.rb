@@ -57,6 +57,32 @@ RSpec.describe Croissant::Stylesheet::AtRule do
     end
   end
 
+  describe Croissant::Stylesheet::AtRule::DeclarationBlock do
+    subject(:at_rule) { described_class.new(name: 'font-face', prelude: '', declarations: declarations) }
+
+    let(:declarations) { Croissant::Stylesheet::Parser.parse_attribute('font-family: Custom; src: url(a.woff)').declarations }
+
+    it 'should not be inlinable' do
+      expect(at_rule.inlinable?).to be(false)
+    end
+
+    it 'should serialize its declarations minified' do
+      expect(at_rule.to_s).to eq('@font-face{font-family:Custom;src:url(a.woff)}')
+    end
+
+    it 'should compare by value including the declarations' do
+      expect(at_rule).to eq(described_class.new(name: 'font-face', prelude: '', declarations: declarations))
+    end
+
+    it 'should hash by value including the declarations' do
+      expect(at_rule.hash).to eq(described_class.new(name: 'font-face', prelude: '', declarations: declarations).hash)
+    end
+
+    it 'should not equal a block with different declarations' do
+      expect(at_rule).not_to eq(described_class.new(name: 'font-face', prelude: '', declarations: []))
+    end
+  end
+
   describe Croissant::Stylesheet::AtRule::Block do
     subject(:at_rule) { described_class.new(name: 'font-face', prelude: '', body: 'font-family: Custom') }
 
