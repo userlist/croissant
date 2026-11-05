@@ -100,8 +100,60 @@ RSpec.describe Croissant::Stylesheet::Parser do
     context 'with a trailing comma in the selector list' do
       let(:value) { 'div, { color: red }' }
 
-      it 'should only create a rule for the real selector' do
-        expect(rules.map { |rule| rule.selector.to_s }).to eq(['div'])
+      it 'should keep the whole rule as written, as the list is invalid' do
+        expect(rules.map { |rule| rule.selector.to_s }).to eq(['div,'])
+      end
+
+      it 'should not make the rule inlinable' do
+        expect(rules.first).not_to be_inlinable
+      end
+    end
+
+    context 'with an invalid selector' do
+      let(:value) { 'div: p { color: red } p { color: blue }' }
+
+      it 'should keep the rule with an unknown selector' do
+        expect(rules.first.selector).to eq(Croissant::Selector::Unknown.new('div: p'))
+      end
+
+      it 'should not make the rule inlinable' do
+        expect(rules.first).not_to be_inlinable
+      end
+
+      it 'should keep the following rules' do
+        expect(rules.last.selector.to_s).to eq('p')
+      end
+    end
+
+    context 'with an invalid selector in a selector list' do
+      let(:value) { 'a, b: hover, .c { color: red }' }
+
+      it 'should keep the whole list as one rule with an unknown selector' do
+        expect(rules.map { |rule| rule.selector.to_s }).to eq(['a, b: hover, .c'])
+      end
+    end
+
+    context 'with an empty selector in a selector list' do
+      let(:value) { 'a, , .c { color: red }' }
+
+      it 'should keep the whole list as one rule with an unknown selector' do
+        expect(rules.map { |rule| rule.selector.to_s }).to eq(['a, , .c'])
+      end
+    end
+
+    context 'with an invalid selector in a conditional group' do
+      let(:value) { '@media print { a: hover { color: red } }' }
+
+      it 'should keep the rule with an unknown selector' do
+        expect(rules.first.rules.first.selector).to be_a(Croissant::Selector::Unknown)
+      end
+    end
+
+    context 'with a selector list containing only commas' do
+      let(:value) { ', { color: red }' }
+
+      it 'should drop the rule' do
+        expect(rules).to be_empty
       end
     end
 
@@ -1011,9 +1063,67 @@ RSpec.describe Croissant::Stylesheet::Parser do
     context 'with a backslash before a newline' do
       let(:value) { ".a\\\nb" }
 
-      it 'should end the identifier at the backslash, as it is not a valid escape' do
-        expect(result.left.selectors.first).to have_attributes(name: 'a')
+      it 'should not parse, as the backslash is not a valid escape' do
+        expect(result).to be_nil
       end
+    end
+
+    context 'with invalid selectors' do
+      [
+        'a: hover', 'div: p', 'a: :before', 'a:', 'a::', '. foo', '# x', '[=foo]', '[a=]', '[a="b', '[a', '[a b]',
+        '> a', 'a >', 'a > > b', 'a + ~ b', 'a!b', 'a)', 'a(b) c', 'a, b', 'p:not()', 'p:not(a, )', 'p:not(: hover)',
+        'p:has()', 'p:has(>)', 'p:has(> > a)', 'p:nth-child(2'
+      ].each do |selector|
+        it "should not parse #{selector.inspect}" do
+          expect(described_class.parse_selector(selector)).to be_nil
+        end
+      end
+    end
+
+    context 'with an invalid argument to :is()' do
+      let(:value) { 'p:is(a, : b, .c)' }
+
+      it 'should drop only that argument, as :is() takes a forgiving selector list' do
+        expect(result.to_s).to eq('p:is(a, .c)')
+      end
+    end
+
+    context 'with only invalid arguments to :where()' do
+      let(:value) { 'p:where(: b)' }
+
+      it 'should keep the pseudo-class without arguments' do
+        expect(result.to_s).to eq('p:where()')
+      end
+    end
+
+    context 'with an invalid argument nested in :is() inside :not()' do
+      let(:value) { 'p:not(:is(: b, .c))' }
+
+      it 'should only drop the argument of :is()' do
+        expect(result.to_s).to eq('p:not(:is(.c))')
+      end
+    end
+
+    context 'with an unsupported but valid pseudo-class argument' do
+      let(:value) { 'li:nth-child(2n of .foo)' }
+
+      it 'should still parse' do
+        expect(result.to_s).to eq('li:nth-child(2n of .foo)')
+      end
+    end
+  end
+
+  describe '#parse_selector_list' do
+    it 'should parse each selector' do
+      expect(described_class.parse_selector_list('a, .b').map(&:to_s)).to eq(['a', '.b'])
+    end
+
+    it 'should not parse a list containing an invalid selector' do
+      expect(described_class.parse_selector_list('a, b: hover')).to be_nil
+    end
+
+    it 'should not parse a list with a trailing comma' do
+      expect(described_class.parse_selector_list('a,')).to be_nil
     end
   end
 end

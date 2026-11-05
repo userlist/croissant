@@ -11,7 +11,7 @@ class Croissant::Transformation::Element
     end
 
     def parse_selector(value)
-      parser.parse_selector_list(value)
+      parser.parse_selector_list(value) || raise(ArgumentError, "invalid selector: #{value.inspect}")
     end
 
     private

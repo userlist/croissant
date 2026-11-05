@@ -38,6 +38,19 @@ RSpec.describe Croissant::Pipeline do
       end
     end
 
+    context 'with an invalid selector' do
+      let(:css) { 'div: p { color: red } a, b: hover { color: blue }' }
+      let(:html) { process("<style>#{css}</style><div><p>a</p><a>b</a></div>") }
+
+      it 'should not inline it, nor the other selectors in its list' do
+        expect(html).not_to include('style="')
+      end
+
+      it 'should preserve the rules as written' do
+        expect(html).to start_with("<style>div: p{color:red}\na, b: hover{color:blue}</style>")
+      end
+    end
+
     context 'with a :root rule' do
       let(:html) do
         process(<<~HTML)

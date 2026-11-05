@@ -29,6 +29,10 @@ RSpec.describe Croissant::Transformation::Element do
     it 'should return a frozen list' do
       expect(Class.new(described_class) { selector 'p' }.selectors).to be_frozen
     end
+
+    it 'should raise for an invalid selector' do
+      expect { Class.new(described_class) { selector 'p, a: hover' } }.to raise_error(ArgumentError, /a: hover/)
+    end
   end
 
   describe '#selectors' do
@@ -36,6 +40,10 @@ RSpec.describe Croissant::Transformation::Element do
       klass = Class.new(described_class) { selector 'p' }
 
       expect(klass.new.selectors).to eq(klass.selectors)
+    end
+
+    it 'should raise for an invalid selector the instance was given' do
+      expect { described_class.new('a: hover') }.to raise_error(ArgumentError, /a: hover/)
     end
 
     it 'should parse a selector the instance was given' do

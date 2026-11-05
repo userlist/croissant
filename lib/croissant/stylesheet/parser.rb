@@ -81,8 +81,10 @@ class Croissant::Stylesheet::Parser
     selector_parser.parse(content)
   end
 
+  # Answers nil when any selector in the list cannot be parsed.
   def parse_selector_list(content)
-    split_segments(content.to_s).filter_map { |segment| parse_selector(segment) }
+    selectors = split_segments(content.to_s).map { |segment| parse_selector(segment) }
+    selectors unless selectors.include?(nil)
   end
 
   private
@@ -180,12 +182,21 @@ class Croissant::Stylesheet::Parser
     declarations = parse_declarations(block)
     return if declarations.empty?
 
-    split_segments(prelude).each do |segment|
-      selector = parse_selector(segment)
-      next unless selector
+    segments = split_segments(prelude)
+    selectors = segments.map { |segment| parse_selector(segment) }
 
-      rules << Croissant::Stylesheet::Rule.new(selector:, declarations:)
-    end
+    # One selector Croissant cannot parse invalidates the whole list, the way it does in a
+    # browser, so none of them may be inlined. The rule is kept as written instead.
+    return consume_unknown_rule(segments, declarations, rules) if selectors.include?(nil)
+
+    selectors.each { |selector| rules << Croissant::Stylesheet::Rule.new(selector:, declarations:) }
+  end
+
+  def consume_unknown_rule(segments, declarations, rules)
+    return if segments.all? { |segment| segment.strip.empty? }
+
+    selector = Croissant::Selector::Unknown.new(segments.map(&:strip).join(', ').strip)
+    rules << Croissant::Stylesheet::Rule.new(selector:, declarations:)
   end
 
   def scan_raw_block(scanner) # rubocop:disable Metrics/MethodLength
@@ -224,8 +235,15 @@ class Croissant::Stylesheet::Parser
     scanner = @segment_scanner
     scanner.string = content
     segments = []
+    terminator = nil
 
-    segments << scan_selector(scanner).first until scanner.eos?
+    until scanner.eos?
+      segment, terminator = scan_selector(scanner)
+      segments << segment
+    end
+
+    # A trailing comma ends the list with an empty selector, which makes it invalid.
+    segments << '' if terminator == COMMA
 
     segments
   end

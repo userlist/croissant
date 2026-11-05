@@ -11,7 +11,6 @@ class Croissant::Selector::Parser
   ].freeze
 
   FUNCTIONAL_PSEUDO_NAMES = %w[is not has where].freeze
-  CLOSING_BRACKET = ']'
   OPENING_PAREN = '('
   CLOSING_PAREN = ')'
 
@@ -113,6 +112,10 @@ class Croissant::Selector::Parser
   NTH_KEYWORDS = { 'odd' => [2, 1], 'even' => [2, 0] }.freeze
   NTH_INTEGER = /\A[+-]?\d+\z/
   NTH_FORMULA = /\A([+-]?\d*)n\s*([+-]\s*\d+)?\z/
+  # Thrown, not raised, on input that is not a selector Croissant can parse: the input is
+  # untrusted, so failing must stay as cheap as succeeding. Every #parse catches it, so a failure
+  # inside :is() or :where() only loses that argument, as their forgiving selector lists require.
+  INVALID = :invalid_selector
 
   class CompoundBuilder
     attr_reader :selectors, :compounds, :combinators
@@ -138,7 +141,14 @@ class Croissant::Selector::Parser
     end
 
     def combinator!(symbol)
-      @pending_combinator = symbol if symbol != :descendant || @pending_combinator.nil?
+      if symbol == :descendant
+        @pending_combinator ||= symbol
+      else
+        # A combinator needs a compound on its left, and only one combinator fits between two.
+        throw INVALID unless @started && [nil, :descendant].include?(@pending_combinator)
+
+        @pending_combinator = symbol
+      end
     end
 
     def flush!
@@ -150,6 +160,9 @@ class Croissant::Selector::Parser
     end
 
     def finish!
+      # And it needs a compound on its right.
+      throw INVALID unless [nil, :descendant].include?(@pending_combinator)
+
       push_compound if @started
     end
 
@@ -177,13 +190,17 @@ class Croissant::Selector::Parser
     @position = 0
   end
 
+  # Answers nil when the selector is empty or cannot be parsed.
   def parse(selector)
     position = @position
-    selector = strip_padding(selector.to_s)
-    builder = scan_compounds(selector, selector.bytesize)
-    return if builder.compounds.empty?
 
-    build_root(builder.compounds, builder.combinators)
+    catch(INVALID) do
+      selector = strip_padding(selector.to_s)
+      builder = scan_compounds(selector, selector.bytesize)
+      return if builder.compounds.empty?
+
+      build_root(builder.compounds, builder.combinators)
+    end
   ensure
     @position = position
   end
@@ -223,29 +240,24 @@ class Croissant::Selector::Parser
 
       case byte
       when HASH
-        if (name = scan_ident(text, position + 1, stop))
-          builder.flush!
-          builder.start!
-          builder.add(Croissant::Selector::Simple::Id.new(name))
-        end
+        name = scan_ident(text, position + 1, stop) || throw(INVALID)
+        builder.flush!
+        builder.start!
+        builder.add(Croissant::Selector::Simple::Id.new(name))
         position = @position
       when DOT
-        if (name = scan_ident(text, position + 1, stop))
-          builder.flush!
-          builder.start!
-          builder.add(Croissant::Selector::Simple::ClassName.new(name))
-        end
+        name = scan_ident(text, position + 1, stop) || throw(INVALID)
+        builder.flush!
+        builder.start!
+        builder.add(Croissant::Selector::Simple::ClassName.new(name))
         position = @position
       when COLON
         @position = position
-        pseudo = parse_pseudo(text, stop)
+        pseudo = parse_pseudo(text, stop) || throw(INVALID)
         position = @position
-
-        if pseudo
-          builder.flush!
-          builder.start!
-          builder.add(pseudo)
-        end
+        builder.flush!
+        builder.start!
+        builder.add(pseudo)
       when LEFT_BRACKET
         @position = position + 1
         attribute = parse_attribute(text, stop)
@@ -253,14 +265,12 @@ class Croissant::Selector::Parser
         builder.flush!
         builder.start!
         builder.add(attribute)
-      when LEFT_PAREN
-        position = matching_paren_index(text, position + 1, stop) + 1
       when ASTERISK
         builder.flush!
         builder.start!
         position += 1
       else
-        position += 1
+        throw INVALID
       end
     end
 
@@ -317,15 +327,24 @@ class Croissant::Selector::Parser
   end
 
   def parse_functional_pseudo(text, stop, name)
-    argument = parse_argument(text, stop)
+    parts = split_selector_list(parse_argument(text, stop))
 
-    if name == 'has'
-      arguments = split_selector_list(argument).filter_map { |part| parse_relative_selector(part) }
-      Croissant::Selector::PseudoClass::Functional::Has.new(arguments)
+    case name
+    when 'has'
+      Croissant::Selector::PseudoClass::Functional::Has.new(parse_strict_list(parts) { parse_relative_selector(_1) })
+    when 'not'
+      Croissant::Selector::PseudoClass::Functional::Not.new(parse_strict_list(parts) { parse(_1) })
     else
-      selectors = split_selector_list(argument).filter_map { |part| parse(part) }
-      FUNCTIONAL_PSEUDO_CLASSES.fetch(name).new(selectors)
+      FUNCTIONAL_PSEUDO_CLASSES.fetch(name).new(parts.filter_map { |part| parse(part) })
     end
+  end
+
+  # :not() and :has() take an unforgiving selector list: one invalid or missing selector, or none
+  # at all, invalidates the whole pseudo-class.
+  def parse_strict_list(parts)
+    throw INVALID if parts.empty?
+
+    parts.map { |part| yield(part) || throw(INVALID) }
   end
 
   def parse_relative_selector(part)
@@ -399,12 +418,12 @@ class Croissant::Selector::Parser
       position += 1
     end
 
-    parts.reject(&:empty?)
+    parts
   end
 
   def parse_attribute(text, stop) # rubocop:disable Metrics/MethodLength
     @position = skip_whitespace(text, @position, stop)
-    name = scan_ident(text, @position, stop) || ''
+    name = scan_ident(text, @position, stop) || throw(INVALID)
     @position = skip_whitespace(text, @position, stop)
 
     operator = parse_attribute_operator(text, stop)
@@ -417,13 +436,18 @@ class Croissant::Selector::Parser
     end
 
     case_insensitive = parse_case_insensitive_flag?(text)
-
-    closing = text.byteindex(CLOSING_BRACKET, @position)
-    @position = closing ? closing + 1 : stop
+    skip_closing_bracket(text, stop)
 
     Croissant::Selector::Simple::Attribute.new(
       name, operator: operator || :exists, value:, case_insensitive:
     )
+  end
+
+  def skip_closing_bracket(text, stop)
+    @position = skip_whitespace(text, @position, stop)
+    throw INVALID unless text.getbyte(@position) == RIGHT_BRACKET
+
+    @position += 1
   end
 
   def parse_attribute_operator(text, stop)
@@ -446,6 +470,8 @@ class Croissant::Selector::Parser
       # An escaped `]` or the whitespace ending a hex escape is part of the value.
       @position += (byte == BACKSLASH && escape_length(text, @position)) || 1
     end
+    # An empty value has to be quoted.
+    throw INVALID if @position == start
 
     unescape(text.byteslice(start, @position - start))
   end
@@ -453,6 +479,8 @@ class Croissant::Selector::Parser
   def parse_quoted_attribute_value(text, quote, stop)
     start = @position + 1
     closing = closing_quote_index(text, quote, start, stop)
+    throw INVALID if closing >= stop
+
     value = text.byteslice(start, closing - start)
     @position = closing + 1
 
@@ -497,6 +525,8 @@ class Croissant::Selector::Parser
 
   def parse_argument(text, stop)
     closing = matching_paren_index(text, @position + 1, stop)
+    throw INVALID if closing >= stop
+
     argument = text.byteslice(@position + 1, closing - @position - 1)
     @position = closing + 1
 
