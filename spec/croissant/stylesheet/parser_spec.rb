@@ -915,6 +915,62 @@ RSpec.describe Croissant::Stylesheet::Parser do
       end
     end
 
+    context 'with non-ASCII names' do
+      let(:value) { 'über#café.日本語.a😀b' }
+
+      it 'should keep each name whole' do
+        expect(result.selectors.map(&:name)).to eq(['über', 'café', '日本語', 'a😀b'])
+      end
+
+      it 'should serialize the names unescaped' do
+        expect(result.to_s).to eq('über#café.日本語.a😀b')
+      end
+    end
+
+    context 'with a non-ASCII uppercase type selector' do
+      let(:value) { 'ÜBER' }
+
+      it 'should only lowercase the ASCII letters, as HTML element names do' do
+        expect(result.selectors.first.name).to eq('Über')
+      end
+    end
+
+    context 'with names starting with a hyphen or an underscore' do
+      let(:value) { '-foo.-bar.--baz._qux' }
+
+      it 'should parse each name' do
+        expect(result.selectors.map(&:name)).to eq(['-foo', '-bar', '--baz', '_qux'])
+      end
+    end
+
+    context 'with a type selector starting with an escape' do
+      let(:value) { '\\61 .b' }
+
+      it 'should unescape the type selector' do
+        expect(result.selectors.map(&:to_s)).to eq(['a', '.b'])
+      end
+    end
+
+    context 'with a class name starting with an escaped digit' do
+      let(:value) { '.\\31 0' }
+
+      it 'should unescape the class name' do
+        expect(result.selectors.first.name).to eq('10')
+      end
+
+      it 'should escape the digit again when serialized' do
+        expect(result.to_s).to eq('.\\31 0')
+      end
+    end
+
+    context 'with a vendor-prefixed pseudo-class' do
+      let(:value) { 'a:-moz-focusring' }
+
+      it 'should parse the pseudo-class' do
+        expect(result.selectors.last.to_s).to eq(':-moz-focusring')
+      end
+    end
+
     context 'with a hex escape followed by a space' do
       let(:value) { '.\31 0' }
 
@@ -1072,7 +1128,8 @@ RSpec.describe Croissant::Stylesheet::Parser do
       [
         'a: hover', 'div: p', 'a: :before', 'a:', 'a::', '. foo', '# x', '[=foo]', '[a=]', '[a="b', '[a', '[a b]',
         '> a', 'a >', 'a > > b', 'a + ~ b', 'a!b', 'a)', 'a(b) c', 'a, b', 'p:not()', 'p:not(a, )', 'p:not(: hover)',
-        'p:has()', 'p:has(>)', 'p:has(> > a)', 'p:nth-child(2'
+        'p:has()', 'p:has(>)', 'p:has(> > a)', 'p:nth-child(2', '.5col', '#5', '.-5', '.-', '-', 'a\\', 'svg|rect',
+        '& .b'
       ].each do |selector|
         it "should not parse #{selector.inspect}" do
           expect(described_class.parse_selector(selector)).to be_nil

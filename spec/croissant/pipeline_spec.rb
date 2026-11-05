@@ -38,6 +38,15 @@ RSpec.describe Croissant::Pipeline do
       end
     end
 
+    it 'should inline rules with non-ASCII and escaped names' do
+      html = process('<style>.über { color: red } #café { font-weight: bold } .\\31 0 { color: blue }</style>' \
+                     '<p class="über" id="café">a</p><p class="10">b</p>')
+
+      expect(html).to eq(
+        '<p class="über" id="café" style="color:red;font-weight:bold">a</p><p class="10" style="color:blue">b</p>'
+      )
+    end
+
     context 'with an invalid selector' do
       let(:css) { 'div: p { color: red } a, b: hover { color: blue }' }
       let(:html) { process("<style>#{css}</style><div><p>a</p><a>b</a></div>") }

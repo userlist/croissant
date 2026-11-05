@@ -2,7 +2,7 @@
 
 class Croissant::Selector::Simple::Type < Croissant::Selector::Simple
   def initialize(name)
-    super(name.downcase)
+    super(name.downcase(:ascii))
   end
 
   def matches?(element)

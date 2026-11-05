@@ -96,12 +96,18 @@ class Croissant::Selector::Parser
     'nth-last-of-type' => Croissant::Selector::PseudoClass::Structural::NthLastOfType
   }.freeze
   CASE_FLAG_BYTES = (CASE_INSENSITIVE_FLAG_BYTES + CASE_SENSITIVE_FLAG_BYTES).freeze
-  WORD_BYTES = Array.new(256) do |byte|
-    UPPERCASE.cover?(byte) || LOWERCASE.cover?(byte) || DIGITS.cover?(byte) ||
-      byte == HYPHEN || byte == UNDERSCORE
+  # Any non-ASCII code point may appear in a name, and every byte of its UTF-8 encoding is at least
+  # NON_ASCII, so a name is scanned byte by byte without ever splitting a character.
+  NON_ASCII = 0x80
+  # https://www.w3.org/TR/css-syntax-3/#ident-start-code-point
+  NAME_START_BYTES = Array.new(256) do |byte|
+    UPPERCASE.cover?(byte) || LOWERCASE.cover?(byte) || byte == UNDERSCORE || byte >= NON_ASCII
   end.freeze
-  TYPE_START_BYTES = Array.new(256) do |byte|
-    UPPERCASE.cover?(byte) || LOWERCASE.cover?(byte)
+  # The bytes besides a name start that may begin an ident: a hyphen, or the backslash of an escape.
+  IDENT_PREFIX_BYTES = [HYPHEN, BACKSLASH].freeze
+  # https://www.w3.org/TR/css-syntax-3/#ident-code-point
+  WORD_BYTES = Array.new(256) do |byte|
+    NAME_START_BYTES[byte] || DIGITS.cover?(byte) || byte == HYPHEN
   end.freeze
   # A backslash and the character after it, or up to six hex digits naming a code point and one
   # optional whitespace character ending them. https://developer.mozilla.org/en-US/docs/Web/CSS/ident
@@ -225,7 +231,7 @@ class Croissant::Selector::Parser
     while position < stop
       byte = text.getbyte(position)
 
-      if TYPE_START_BYTES[byte]
+      if NAME_START_BYTES[byte] || (IDENT_PREFIX_BYTES.include?(byte) && ident_start?(text, position, stop))
         name = scan_ident(text, position, stop)
         builder.flush!
         builder.start!
@@ -299,7 +305,7 @@ class Croissant::Selector::Parser
     name = scan_ident(text, @position + 1, stop)
     return unless name
 
-    name.downcase!
+    name.downcase!(:ascii)
 
     return Croissant::Selector::PseudoElement.new(name) if legacy_pseudo_element?(name)
 
@@ -565,10 +571,34 @@ class Croissant::Selector::Parser
   # The ident sequence at position, unescaped, leaving @position after it. Answers nil when there is
   # none. Without escapes, which is nearly always, it is a single slice of text.
   def scan_ident(text, position, stop)
+    return if position >= stop
+
+    # A plain name start is by far the most common, so it skips the method call.
+    return unless NAME_START_BYTES[text.getbyte(position)] || ident_start?(text, position, stop)
+
     @position = position + word_length(text, position, stop)
     return scan_escaped_ident(text, position, stop) if text.getbyte(@position) == BACKSLASH
 
     text.byteslice(position, @position - position) if @position > position
+  end
+
+  # Whether an ident sequence starts at position: a name-start code point, a valid escape, or a
+  # hyphen followed by either or by a second hyphen, but never a digit.
+  # https://www.w3.org/TR/css-syntax-3/#would-start-an-identifier
+  def ident_start?(text, position, stop)
+    return false if position >= stop
+
+    byte = text.getbyte(position)
+
+    if byte == HYPHEN
+      position += 1
+      return false if position >= stop
+
+      byte = text.getbyte(position)
+      return true if byte == HYPHEN
+    end
+
+    byte == BACKSLASH ? !escape_length(text, position).nil? : NAME_START_BYTES[byte]
   end
 
   def scan_escaped_ident(text, position, stop)
