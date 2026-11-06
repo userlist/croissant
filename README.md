@@ -7,7 +7,9 @@
 
 **Modern processing pipeline for HTML emails**
 
-Croissant is a processing pipeline that parses HTML and CSS of emails to apply a series of transformations to make them more compatible with various email clients.
+Croissant parses the HTML and CSS and applies a series of transformations that make it render more consistently across email clients. The best known of those transformations is CSS inlining, but the library is built as a pipeline, so inlining is one composable step among several rather than the whole library.
+
+Croissant brings its own CSS parser, its own selector engine, and its own implementation of the cascade.
 
 ## Installation
 
@@ -22,6 +24,63 @@ If bundler is not being used to manage dependencies, install the gem by executin
 ```bash
 gem install croissant
 ```
+
+## Usage
+
+### Quick start
+
+```ruby
+require 'croissant'
+
+Croissant.process(html)
+```
+
+Given this input:
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <style>
+      .wrapper { -croissant-width: 600; -croissant-align: center }
+      .cell { background-color: #2563eb; text-align: center; padding: 12px 24px }
+      .button { color: #ffffff }
+      .cell:hover { background-color: #1d4ed8 }
+      @media (max-width: 600px) { .wrapper { width: 100% } }
+    </style>
+  </head>
+  <body>
+    <table class="wrapper">
+      <tr>
+        <td class="cell"><a class="button" href="https://example.com">Confirm your email</a></td>
+      </tr>
+    </table>
+  </body>
+</html>
+```
+
+`Croissant.process` returns:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style>.cell:hover{background-color:#1d4ed8} @media (max-width: 600px){.wrapper{width:100%}}</style>
+  </head>
+  <body>
+    <table class="wrapper" align="center" width="600">
+      <tr>
+        <td class="cell" style="background-color:#2563eb;text-align:center;padding:12px 24px" align="center" bgcolor="#2563eb"><a class="button" href="https://example.com" style="color:#ffffff">Confirm your email</a></td>
+      </tr>
+    </table>
+  </body>
+</html>
+```
+
+The inlinable rules moved into `style` attributes. The `:hover` rule and the media query cannot be expressed as an inline style, so they are kept in a `<style>` element instead of being thrown away. (The `Content-Type` meta element is added by Nokogiri when it parses a full document.)
+
+Some email clients ignore CSS but still honor the old HTML presentational attributes, so Croissant mirrors supported properties into them as well: the cell's `background-color` and `text-align` also become `bgcolor` and `align`. Properties prefixed with `-croissant-` exist only to produce an attribute and are removed from the style afterwards. That is how the table gets `width="600"` and `align="center"` without any inline style of its own.
 
 ## Development
 
